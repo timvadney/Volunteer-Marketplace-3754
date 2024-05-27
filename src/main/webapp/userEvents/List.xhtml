@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  - Created by Osman Balci on 2024.2.8
+  - Copyright © 2024 Osman Balci. All rights reserved.
+  -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:ui="jakarta.faces.facelets"
+      xmlns:h="jakarta.faces.html"
+      xmlns:f="jakarta.faces.core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:c="jakarta.tags.core">
+
+<!-- This page is constructed based on the siteTemplate -->
+<ui:composition template="/template/siteTemplate.xhtml">
+    <ui:define name="title">
+        <!-- Set the page title -->
+        <h:outputText value="My Events"/>
+    </ui:define>
+
+    <!-- Create the content for this page below -->
+    <ui:define name="editableContent">
+
+        <!-- In case of Jakarta Faces validation error, set 'selected' to null in countryApiController -->
+        <c:if test="#{facesContext.validationFailed}">
+            ${userEventController.unselect()}
+        </c:if>
+
+        <!-- Set 'selected' to null in countryApiController when the user refreshes / reloads this Jakarta Faces page -->
+        <f:metadata>
+            <f:viewAction action="#{userEventController.unselect()}" rendered="#{facesContext.postback}"/>
+        </f:metadata>
+
+        <div align="center">
+            <h:form id="UserEventsListForm">
+                <p:panel header="My Events">
+                    <p:dataTable id="datalist"
+                                 value="#{userEventController.listOfUserEvents}"
+                                 var="aEvent"
+                                 widgetVar="userEventsDataTable"
+                                 selectionMode="single"
+                                 selection="#{userEventController.selected}"
+                                 reflow="true"
+                                 showGridlines="true"
+                                 paginator="true"
+                                 rowKey="#{aEvent.id}"
+                                 rows="5"
+                                 rowsPerPageTemplate="5,10,20,30,50,70,90">
+
+<!--                        <p:ajax event="rowSelect" update="createButton viewButton editButton deleteButton"/>-->
+<!--                        <p:ajax event="rowUnselect" update="createButton viewButton editButton deleteButton"/>-->
+
+
+
+
+                        <!--
+                        *********************
+                        *    Event Logo   *
+                        *********************
+                        Country code must be in lower case for the flag URL
+                        -->
+                        <p:column headerText="Logo" style="width: 60px; text-align: center; vertical-align: top">
+                            <img src="#{aEvent.imageUrl}"
+                                 alt="Event Logo" width="60px" height="60px"/>
+                        </p:column>
+
+                        <!--
+                        *********************
+                        *    Event Organization   *
+                        *********************
+                        -->
+                        <p:column headerText="Organization" sortBy="#{aEvent.organization}"
+                                  style="vertical-align: top; width: 200px;">
+                            <h:outputText value="#{aEvent.organization}"/>
+                        </p:column>
+
+                        <!--
+                        *********************
+                        *    Event Name   *
+                        *********************
+                        -->
+                        <p:column headerText="Event Name" sortBy="#{aEvent.title}"
+                                  style="vertical-align: top; width: 200px;">
+                            <h:outputText value="#{aEvent.title}"/>
+                        </p:column>
+
+                        <!--
+                        ******************************
+                        *    Event Description   *
+                        ******************************
+                        -->
+                        <p:column headerText="Description" sortBy="#{aEvent.description}"
+                                  style="vertical-align: top">
+                            <h:outputText value="#{aEvent.description}"/>
+                        </p:column>
+
+                        <!--
+                        *********************
+                        *  Event Location *
+                        *********************
+                        -->
+                        <p:column headerText="Location" sortBy="#{aEvent.location}"
+                                  style="vertical-align: top; text-align: center; width: 150px">
+                            <h:outputText value="#{aEvent.location}"/>
+                        </p:column>
+
+                        <!--
+                        *********************
+                        *  Event Date  *
+                        *********************
+                        -->
+                        <p:column headerText="Date" sortBy="#{aEvent.date}"
+                                  style="vertical-align: top; text-align: center; width: 150px">
+                            <h:outputText value="#{aEvent.date}">
+                                <f:convertDateTime pattern="MM/dd/yyyy" />
+                            </h:outputText>
+                        </p:column>
+
+                        <!--
+                        *************************
+                        *   Data Table Footer   *
+                        *************************
+                        -->
+                        <f:facet name="footer">
+                            <div align="center">
+<!--                                &lt;!&ndash; CREATE button: id is used since it is referenced to be activated or deactivated &ndash;&gt;-->
+<!--                                <p:commandButton id="createButton" value="Create" icon="fas fa-plus" styleClass="rounded-button"-->
+<!--                                                 actionListener="#{popularEventController.prepareCreate()}"-->
+<!--                                                 update=":EventCreateForm" oncomplete="PF('EventCreateDialog').show()"/>-->
+<!--                                &nbsp;-->
+<!--                                &lt;!&ndash; VIEW button: id is used since it is referenced to be activated or deactivated &ndash;&gt;-->
+<!--                                <p:commandButton id="viewButton" value="View" icon="fas fa-eye" styleClass="rounded-button"-->
+<!--                                                 update=":EventViewDlg" oncomplete="PF('EventViewDialog').show()"-->
+<!--                                                 disabled="#{empty popularEventController.selected}"/>-->
+<!--                                &nbsp;-->
+<!--                                &lt;!&ndash; EDIT button: id is used since it is referenced to be activated or deactivated &ndash;&gt;-->
+<!--                                <p:commandButton id="editButton" value="Edit" icon="fas fa-edit" styleClass="rounded-button"-->
+<!--                                                 update=":EventEditDlg" oncomplete="PF('EventEditDialog').show()"-->
+<!--                                                 disabled="#{empty popularEventController.selected}"/>-->
+<!--                                &nbsp;-->
+<!--                                &lt;!&ndash; ***************************************************-->
+<!--                                Display a Confirmation dialog for the DELETE button-->
+<!--                                id is used since it is referenced to be activated or not-->
+<!--                                **************************************************** &ndash;&gt;-->
+<!--                                <p:commandButton id="deleteButton" value="Delete" icon="fas fa-trash-alt"  styleClass="rounded-button"-->
+<!--                                                 actionListener="#{popularEventController.destroy()}"-->
+<!--                                                 update="datalist,:growlInfoMessage,:growlWarningMessage,:growlErrorMessage,:growlFatalMessage"-->
+<!--                                                 disabled="#{empty popularEventController.selected}">-->
+
+<!--                                    <p:confirm header="Deletion Confirmation"-->
+<!--                                               message="Are you sure you want to permanently delete the selected event #{popularEventController.selected.title} from the database?"/>-->
+<!--                                </p:commandButton>-->
+
+<!--                                <p:confirmDialog id="confirmDialogBox" global="true" showEffect="fade" hideEffect="fade" responsive="true" width="350">-->
+<!--                                    <div align="center">-->
+<!--                                        <p:commandButton value="No" type="button" styleClass="ui-confirmdialog-no" icon="fas fa-window-close" />-->
+<!--                                        &nbsp;-->
+<!--                                        <p:commandButton value="Yes" type="button" class="ui-confirmdialog-yes ui-button-danger" icon="fas fa-check-square" />-->
+<!--                                    </div>-->
+<!--                                </p:confirmDialog>-->
+<!--                                &nbsp;-->
+<!--                                &lt;!&ndash; SIGN UP button: id is used since it is referenced to be activated or deactivated &ndash;&gt;-->
+<!--                                <c:if test="#{userController.userIsSignedIn() == true}">-->
+<!--                                    <p:commandButton id="signUpButton" value="Sign Up" icon="fa-regular fa-pen-to-square" styleClass="rounded-button"-->
+<!--                                                     onclick="window.open('#{popularEventController.selected.websiteUrl}', '_blank');"-->
+<!--                                                     oncomplete="PF('EventCheckSignUpDialog').show()" update=":EventCheckSignUpDlg"-->
+<!--                                                     disabled="#{empty popularEventController.selected}">-->
+<!--                                    </p:commandButton>-->
+<!--                                </c:if>-->
+
+                            </div>
+                        </f:facet>
+                    </p:dataTable>
+                </p:panel>
+            </h:form>
+        </div>
+<!--        &lt;!&ndash; Clicking the Create button displays the included Create.xhtml file in a dialog window on top of this page. &ndash;&gt;-->
+<!--        <ui:include src="/popularEvents/Create.xhtml"/>-->
+
+<!--        &lt;!&ndash; Clicking the View button displays the included View.xhtml file in a dialog window on top of this page. &ndash;&gt;-->
+<!--        <ui:include src="/popularEvents/View.xhtml"/>-->
+
+<!--        &lt;!&ndash; Clicking the EDit button displays the included Edit.xhtml file in a dialog window on top of this page. &ndash;&gt;-->
+<!--        <ui:include src="/popularEvents/Edit.xhtml"/>-->
+
+<!--        &lt;!&ndash; Clicking the Sign Up button displays the included CheckSignUp.xhtml file in a dialog window on top of this page. &ndash;&gt;-->
+<!--        <ui:include src="/popularEvents/CheckSignUp.xhtml"/>-->
+
+
+    </ui:define>
+</ui:composition>
+</html>

@@ -1,0 +1,998 @@
+Index: src/main/java/edu/vt/controllers/PopularEventController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Created by Osman Balci and Tim Vadney on 2024.3.18\r\n * Copyright © 2024 Osman Balci and Tim Vadney. All rights reserved.\r\n */\r\npackage edu.vt.controllers;\r\n\r\nimport edu.vt.EntityBeans.Charity;\r\nimport edu.vt.EntityBeans.PopularEvent;\r\nimport edu.vt.EntityBeans.UserEvent;\r\nimport edu.vt.FacadeBeans.PopularEventFacade;\r\nimport edu.vt.FacadeBeans.UserEventFacade;\r\nimport edu.vt.controllers.util.JsfUtil;\r\nimport edu.vt.controllers.util.JsfUtil.PersistAction;\r\nimport edu.vt.globals.Constants;\r\nimport edu.vt.globals.Methods;\r\n\r\nimport java.io.Serializable;\r\nimport java.util.Comparator;\r\nimport java.util.List;\r\nimport java.util.logging.Level;\r\nimport java.util.logging.Logger;\r\n\r\nimport jakarta.ejb.EJB;\r\nimport jakarta.ejb.EJBException;\r\nimport jakarta.inject.Inject;\r\nimport jakarta.inject.Named;\r\nimport jakarta.enterprise.context.SessionScoped;\r\nimport org.primefaces.shaded.json.JSONArray;\r\nimport org.primefaces.shaded.json.JSONObject;\r\n\r\n/*\r\n---------------------------------------------------------------------------\r\nThe @Named (jakarta.inject.Named) annotation indicates that the objects\r\ninstantiated from this class will be managed by the Contexts and Dependency\r\nInjection (CDI) container. The name \"publicFavoriteController\" is used within\r\nExpression Language (EL) expressions in Jakarta Faces (XHTML) facelets pages to\r\naccess the properties and invoke methods of this class.\r\n---------------------------------------------------------------------------\r\n */\r\n@Named(\"popularEventController\")\r\n\r\n/*\r\nThe @SessionScoped annotation preserves the values of the PublicFavoriteController\r\nobject's instance variables across multiple HTTP request-response cycles\r\nas long as the user's established HTTP session is alive.\r\n */\r\n@SessionScoped\r\n\r\n/*\r\n-----------------------------------------------------------------------------\r\nMarking the PublicFavoriteController class as \"implements Serializable\" implies that\r\ninstances of the class can be automatically serialized and deserialized.\r\n\r\nSerialization is the process of converting a class instance (object)\r\nfrom memory into a suitable format for storage in a file or memory buffer,\r\nor for transmission across a network connection link.\r\n\r\nDeserialization is the process of recreating a class instance (object)\r\nin memory from the format under which it was stored.\r\n-----------------------------------------------------------------------------\r\n */\r\npublic class PopularEventController implements Serializable {\r\n    /*\r\n    ===============================\r\n    Instance Variables (Properties)\r\n    ===============================\r\n    */\r\n\r\n    /*\r\n    The @EJB annotation directs the EJB Container Manager to inject (store) the object reference of the\r\n    PublicFavoriteFacade bean into the instance variable 'publicFavoriteFacade' after it is instantiated at runtime.\r\n     */\r\n    @EJB\r\n    private PopularEventFacade popularEventFacade;\r\n    @EJB\r\n    private UserEventFacade userEventFacade;\r\n    @Inject\r\n    private UserEventController userEventController;\r\n    @Inject\r\n    private UserController userController;\r\n    @Inject\r\n    private OrganizationController organizationController;\r\n\r\n    /*\r\n    ************************************************************************************************\r\n    The import jakarta.inject.Inject; brings in the jakarta.inject package into our project.\r\n    \"This package specifies a means for obtaining objects in such a way as to maximize\r\n    reusability, testability and maintainability compared to traditional approaches such as\r\n    constructors, factories, and service locators (e.g., JNDI). This process, known as\r\n    dependency injection, is beneficial to most nontrivial applications.\" [Oracle]\r\n\r\n    The @Inject annotation of the instance variable \"private EditorController editorController;\"\r\n    directs the CDI Container Manager to store the object reference of the EditorController class\r\n    bean object, after it is instantiated at runtime, into the instance variable \"editorController\".\r\n\r\n    With this injection, the instance variables and instance methods of the EditorController\r\n    class can be accessed in this CDI-managed bean.\r\n    ************************************************************************************************\r\n    */\r\n    @Inject\r\n    private EditorController editorController;\r\n\r\n    // List of object references of public favoriet objects\r\n    private List<PopularEvent> listOfPopularEvents = null;\r\n\r\n    // selected = object reference of a selected public favorite object\r\n    private PopularEvent selected;\r\n\r\n    // Flag indicating if public favorite data changed or not\r\n    private Boolean popularEventDataChanged;\r\n\r\n    // searchItems = List of object references of public favorite objects found in the search\r\n    private List<PopularEvent> searchItems = null;\r\n\r\n    // searchCategory implies what field of a public favorite will be searched through\r\n    private String searchCategory;\r\n\r\n    // searchString contains the character string the user entered for searching the selected searchCategory\r\n    private String searchString;\r\n\r\n    // Search type from 1 to 5\r\n    private Integer searchType;\r\n\r\n    // Search Query Variables (Q = Query)\r\n\r\n\r\n    // geocode() method below computes the following instance variables\r\n    private String locationLatString;\r\n    private String locationLngString;\r\n    private double locationLatDouble;\r\n    private double locationLngDouble;\r\n    // Used in map.js to show directions\r\n    private String startingName;\r\n    private String startingAddress;\r\n    private double startingLat;\r\n    private double startingLng;\r\n    private double destinationLat;\r\n    private double destinationLng;\r\n    private String travelMode;\r\n    private String travelModeCapitalized;\r\n\r\n\r\n\r\n\r\n    /*\r\n    =========================\r\n    Getter and Setter Methods\r\n    =========================\r\n     */\r\n    public List<PopularEvent> getListOfPopularEvents() {\r\n        if (listOfPopularEvents == null) {\r\n            listOfPopularEvents = popularEventFacade.findAll();\r\n\r\n            // Sort the List of PublicFavorite objects with respect to nameCommon property in alphabetical order\r\n            listOfPopularEvents.sort(Comparator.comparing(PopularEvent::getTitle));\r\n        }\r\n        return listOfPopularEvents;\r\n    }\r\n\r\n    public String getSearchCategory() {\r\n        return searchCategory;\r\n    }\r\n\r\n    public void setSearchCategory(String searchCategory) {\r\n        this.searchCategory = searchCategory;\r\n    }\r\n\r\n    public String getSearchString() {\r\n        return searchString;\r\n    }\r\n\r\n    public void setSearchString(String searchString) {\r\n        this.searchString = searchString;\r\n    }\r\n\r\n    public PopularEventFacade getPopularEventFacade() {\r\n        return popularEventFacade;\r\n    }\r\n\r\n    public void setPopularEventFacade(PopularEventFacade popularEventFacade) {\r\n        this.popularEventFacade = popularEventFacade;\r\n    }\r\n\r\n    public UserController getUserController() {\r\n        return userController;\r\n    }\r\n\r\n    public void setUserController(UserController userController) {\r\n        this.userController = userController;\r\n    }\r\n\r\n    public void setListOfPopularEvents(List<PopularEvent> listOfPopularEvents) {\r\n        this.listOfPopularEvents = listOfPopularEvents;\r\n    }\r\n\r\n    public PopularEvent getSelected() {\r\n        return selected;\r\n    }\r\n\r\n    public void setSelected(PopularEvent selected) {\r\n        this.selected = selected;\r\n    }\r\n\r\n    public Boolean getPopularEventDataChanged() {\r\n        return popularEventDataChanged;\r\n    }\r\n\r\n    public void setPopularEventDataChanged(Boolean popularEventDataChanged) {\r\n        this.popularEventDataChanged = popularEventDataChanged;\r\n    }\r\n\r\n    public List<PopularEvent> getSearchItems() {\r\n        return searchItems;\r\n    }\r\n\r\n    public void setSearchItems(List<PopularEvent> searchItems) {\r\n        this.searchItems = searchItems;\r\n    }\r\n\r\n    public Integer getSearchType() {\r\n        return searchType;\r\n    }\r\n\r\n    public void setSearchType(Integer searchType) {\r\n        this.searchType = searchType;\r\n    }\r\n\r\n    public UserEventFacade getUserEventFacade() {\r\n        return userEventFacade;\r\n    }\r\n\r\n    public void setUserEventFacade(UserEventFacade userEventFacade) {\r\n        this.userEventFacade = userEventFacade;\r\n    }\r\n\r\n    public UserEventController getUserEventController() {\r\n        return userEventController;\r\n    }\r\n\r\n    public void setUserEventController(UserEventController userEventController) {\r\n        this.userEventController = userEventController;\r\n    }\r\n\r\n    public String getLocationLatString() {\r\n        return locationLatString;\r\n    }\r\n\r\n    public void setLocationLatString(String locationLatString) {\r\n        this.locationLatString = locationLatString;\r\n    }\r\n\r\n    public String getLocationLngString() {\r\n        return locationLngString;\r\n    }\r\n\r\n    public void setLocationLngString(String locationLngString) {\r\n        this.locationLngString = locationLngString;\r\n    }\r\n\r\n    public double getLocationLatDouble() {\r\n        return locationLatDouble;\r\n    }\r\n\r\n    public void setLocationLatDouble(double locationLatDouble) {\r\n        this.locationLatDouble = locationLatDouble;\r\n    }\r\n\r\n    public double getLocationLngDouble() {\r\n        return locationLngDouble;\r\n    }\r\n\r\n    public void setLocationLngDouble(double locationLngDouble) {\r\n        this.locationLngDouble = locationLngDouble;\r\n    }\r\n\r\n    public String getStartingName() {\r\n        return startingName;\r\n    }\r\n\r\n    public void setStartingName(String startingName) {\r\n        this.startingName = startingName;\r\n    }\r\n\r\n    public String getStartingAddress() {\r\n        return startingAddress;\r\n    }\r\n\r\n    public void setStartingAddress(String startingAddress) {\r\n        this.startingAddress = startingAddress;\r\n    }\r\n\r\n    public double getStartingLat() {\r\n        return startingLat;\r\n    }\r\n\r\n    public void setStartingLat(double startingLat) {\r\n        this.startingLat = startingLat;\r\n    }\r\n\r\n    public double getStartingLng() {\r\n        return startingLng;\r\n    }\r\n\r\n    public void setStartingLng(double startingLng) {\r\n        this.startingLng = startingLng;\r\n    }\r\n\r\n    public double getDestinationLat() {\r\n        return destinationLat;\r\n    }\r\n\r\n    public void setDestinationLat(double destinationLat) {\r\n        this.destinationLat = destinationLat;\r\n    }\r\n\r\n    public double getDestinationLng() {\r\n        return destinationLng;\r\n    }\r\n\r\n    public void setDestinationLng(double destinationLng) {\r\n        this.destinationLng = destinationLng;\r\n    }\r\n\r\n    public String getTravelMode() {\r\n        return travelMode;\r\n    }\r\n\r\n    public void setTravelMode(String travelMode) {\r\n        this.travelMode = travelMode;\r\n    }\r\n\r\n    public String getTravelModeCapitalized() {\r\n        return travelModeCapitalized;\r\n    }\r\n\r\n    public void setTravelModeCapitalized(String travelModeCapitalized) {\r\n        this.travelModeCapitalized = travelModeCapitalized;\r\n    }\r\n\r\n    /*\r\n     *****************************\r\n     *   Return Google API Key   *\r\n     *****************************\r\n     */\r\n    public String googleApiKey() {\r\n        return Constants.GOOGLE_API_KEY;\r\n    }\r\n\r\n    /*\r\n     ***************************************\r\n     *   Prepare to Create a New Public Favorite   *\r\n     ***************************************\r\n     */\r\n    public PopularEvent prepareCreate() {\r\n        /*\r\n        Instantiate a new PublicFavorite object and store its object reference into\r\n        instance variable 'selected'. The PublicFavorite class is defined in PublicFavorite.java\r\n         */\r\n        selected = new PopularEvent();\r\n        return selected;\r\n    }\r\n\r\n\r\n    /*\r\n     ********************************************\r\n     *   CREATE a New Public Favorite in the Database   *\r\n     ********************************************\r\n     */\r\n    public void create() {\r\n        Methods.preserveMessages();\r\n        /*\r\n        An enum is a special Java type used to define a group of constants.\r\n        The constants CREATE, DELETE and UPDATE are defined as follows in JsfUtil.java\r\n\r\n                public enum PersistAction {\r\n                    CREATE,\r\n                    DELETE,\r\n                    UPDATE\r\n                }\r\n         */\r\n        // Will need to change PopularEvent table to have organization column reference Organization table if we\r\n        // want a button to view that organization when clicking on the event.\r\n        // Then we can say organization = organizationController.getSignedInOrganization();\r\n        // And then easily reference for a button to view the org.\r\n\r\n        /*\r\n         The object reference of the public favorite to be created is stored in the instance variable 'selected'\r\n         See the persist method below.\r\n         */\r\n        persist(PersistAction.CREATE, \"New public favorite business is Successfully Created!\");\r\n\r\n        if (!JsfUtil.isValidationFailed()) {\r\n            // No Jakarta Faces validation error. The CREATE operation is successfully performed.\r\n            selected = null;            // Remove selection\r\n            listOfPopularEvents = null;     // Invalidate listOfPublicFavorites to trigger re-query.\r\n            popularEventDataChanged = true;\r\n        }\r\n    }\r\n\r\n    /*\r\n     ***********************************************\r\n     *   UPDATE Selected Public Favorite in the Database   *\r\n     ***********************************************\r\n     */\r\n    public void update() {\r\n        Methods.preserveMessages();\r\n        /*\r\n         The object reference of the public favorite to be updated is stored in the instance variable 'selected'\r\n         See the persist method below.\r\n         */\r\n        persist(PersistAction.UPDATE, \"Public Favorite Business was Successfully Updated!\");\r\n\r\n        if (!JsfUtil.isValidationFailed()) {\r\n            // No Jakarta Faces validation error. The UPDATE operation is successfully performed.\r\n            selected = null;        // Remove selection\r\n            listOfPopularEvents = null; // Invalidate listOfPublicFavorites to trigger re-query.\r\n            popularEventDataChanged = true;\r\n        }\r\n    }\r\n\r\n    /*\r\n     *************************************\r\n     *   Cancel and Display List.xhtml   *\r\n     *************************************\r\n     */\r\n    public String cancel() {\r\n        // Unselect previously selected movie object if any\r\n        selected = null;\r\n        return \"/publicFavorite/List?faces-redirect=true\";\r\n    }\r\n\r\n    /*\r\n     ****************************************\r\n     *   Unselect Selected Public Favorite Object   *\r\n     ****************************************\r\n     */\r\n    public void unselect() {\r\n        selected = null;\r\n    }\r\n\r\n    /*\r\n     *************************************************\r\n     *   DELETE Selected Public Favorite from the Database   *\r\n     *************************************************\r\n     */\r\n    public void destroy() {\r\n        /*\r\n         The object reference of the public favorite to be deleted is stored in the instance variable 'selected'\r\n         See the persist method below.\r\n         */\r\n        persist(PersistAction.DELETE, \"Public favorite business is Successfully Deleted!\");\r\n\r\n        if (!JsfUtil.isValidationFailed()) {\r\n            // No Jakarta Faces validation error. The DELETE operation is successfully performed.\r\n            selected = null;            // Remove selection\r\n            listOfPopularEvents = null;     // Invalidate list of public favorites to trigger re-query.\r\n            popularEventDataChanged = true;\r\n        }\r\n    }\r\n\r\n    /*\r\n     **********************************************************************************************\r\n     *   Perform CREATE, UPDATE (EDIT), and DELETE (DESTROY, REMOVE) Operations in the Database   *\r\n     **********************************************************************************************\r\n     */\r\n\r\n    /**\r\n     * @param persistAction  refers to CREATE, UPDATE (Edit) or DELETE action\r\n     * @param successMessage displayed to inform the user about the result\r\n     */\r\n    private void persist(PersistAction persistAction, String successMessage) {\r\n        if (selected != null) {\r\n            try {\r\n                if (persistAction != PersistAction.DELETE) {\r\n                    /*\r\n                     -------------------------------------------------\r\n                     Perform CREATE or EDIT operation in the database.\r\n                     -------------------------------------------------\r\n                     The edit(selected) method performs the SAVE (STORE) operation of the \"selected\"\r\n                     object in the database regardless of whether the object is a newly\r\n                     created object (CREATE) or an edited (updated) object (EDIT or UPDATE).\r\n\r\n                     PublicFavoriteFacade inherits the edit(selected) method from the AbstractFacade class.\r\n                     */\r\n                    popularEventFacade.edit(selected);\r\n                } else {\r\n                    /*\r\n                     -----------------------------------------\r\n                     Perform DELETE operation in the database.\r\n                     -----------------------------------------\r\n                     The remove(selected) method performs the DELETE operation of the \"selected\"\r\n                     object in the database.\r\n\r\n                     PublicFavoriteFacade inherits the remove(selected) method from the AbstractFacade class.\r\n                     */\r\n                    popularEventFacade.remove(selected);\r\n                }\r\n                JsfUtil.addSuccessMessage(successMessage);\r\n            } catch (EJBException ex) {\r\n                String msg = \"\";\r\n                Throwable cause = ex.getCause();\r\n                if (cause != null) {\r\n                    msg = cause.getLocalizedMessage();\r\n                }\r\n                if (msg.length() > 0) {\r\n                    JsfUtil.addErrorMessage(msg);\r\n                } else {\r\n                    JsfUtil.addErrorMessage(ex, \"A persistence error occurred!\");\r\n                }\r\n            } catch (Exception ex) {\r\n                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);\r\n                JsfUtil.addErrorMessage(ex, \"A persistence error occurred\");\r\n            }\r\n        }\r\n    }\r\n\r\n    /*\r\n     *****************************************\r\n     *   Display the Search Results JF Page  *\r\n     *****************************************\r\n     */\r\n    public String search(Integer type) {\r\n        // Set search type given as input parameter\r\n        searchType = type;\r\n\r\n        // Unselect previously selected public favorite if any before showing the search results\r\n        selected = null;\r\n\r\n        // Invalidate list of search items to trigger re-query.\r\n        searchItems = null;\r\n\r\n        return \"/databaseSearch/DatabaseSearchResults?faces-redirect=true\";\r\n    }\r\n\r\n    public String addToFavorites()\r\n    {\r\n        // Check to see if the cocktail to be added is already in the database\r\n        Methods.preserveMessages();\r\n        if (!userController.userIsSignedIn()) {\r\n            Methods.showMessage(\"Information\", \"Unable to Donate!\",\r\n                    \"To donate, a user must have signed in!\");\r\n            return \"/popularEvents/List?faces-redirect=true\";\r\n        }\r\n        else\r\n        {\r\n            // Obtain the selected cocktails's common name from the API search results list\r\n            String nameQuery = selected.getTitle();\r\n\r\n            // Check to see if there is a cocktail by that name in the favorites database\r\n            UserEvent foundEvent = userEventFacade.findByName(nameQuery);\r\n\r\n            if (foundEvent != null) {\r\n                // The cocktail to be added already exists in the database\r\n                Methods.showMessage(\"Information\", \"Event already exists!\",\r\n                        \"You have already signed up for this event!\");\r\n                return \"/popularEvents/List?faces-redirect=true\";\r\n            }\r\n\r\n            UserEvent newEvent = userEventController.prepareCreate();\r\n\r\n            newEvent.setTitle(selected.getTitle());\r\n            newEvent.setOrganization(selected.getOrganization());\r\n            newEvent.setDescription(selected.getDescription());\r\n            newEvent.setImageUrl(selected.getImageUrl());\r\n            newEvent.setWebsiteUrl(selected.getWebsiteUrl());\r\n            newEvent.setAddress1(selected.getAddress1());\r\n            newEvent.setAddress2(selected.getAddress2());\r\n            newEvent.setCity(selected.getCity());\r\n            newEvent.setState(selected.getState());\r\n            newEvent.setZipCode(selected.getZipCode());\r\n            newEvent.setDate(selected.getDate());\r\n\r\n            userEventController.create();\r\n\r\n            return \"/userCharities/List?faces-redirect=true\";\r\n        }\r\n    }\r\n\r\n    /*\r\n     ****************************************************************************************************\r\n     *   Return the list of object references of all those public favorites that satisfy the search criteria   *\r\n     ****************************************************************************************************\r\n     */\r\n    // This is the Getter method for the instance variable searchItems\r\n//    public List<PublicFavorite> getSearchItems() {\r\n//        /*\r\n//        =============================================================================================\r\n//        You must construct and return the search results List \"searchItems\" ONLY IF the List is null.\r\n//        Any List provided to p:dataTable to display must be returned ONLY IF the List is null\r\n//        ===> in order for the column-sort to work. <===\r\n//        =============================================================================================\r\n//         */\r\n//        if (searchItems == null) {\r\n//            switch (searchType) {\r\n//                case 1: // Search Type 1\r\n//                    switch (searchCategory) {\r\n//                        case \"Name\":\r\n//                            // Return the list of object references of all those businesses where\r\n//                            // business name contains the searchString entered by the user.\r\n//                            searchItems = publicFavoriteFacade.nameQuery(searchString);\r\n//                            break;\r\n//                        case \"Address\":\r\n//                            // Return the list of object references of all those businesses where\r\n//                            // address1 contains the searchString entered by the user.\r\n//                            searchItems = publicFavoriteFacade.addressQuery(searchString);\r\n//                            break;\r\n//                        case \"City\":\r\n//                            // Return the list of object references of all those businesses where\r\n//                            // city contains the searchString entered by the user.\r\n//                            searchItems = publicFavoriteFacade.cityQuery(searchString);\r\n//                            break;\r\n//                        default:\r\n//                            // Return the list of object references of all those businesses where business name OR\r\n//                            // address1 OR city contains the searchString entered by the user.\r\n//                            searchItems = publicFavoriteFacade.allQuery(searchString);\r\n//                    }\r\n//                    break;\r\n//                case 2: // Search Type 2\r\n//                    // Business name contains nameQ AND rating ≥ ratingQ\r\n//                    searchItems = publicFavoriteFacade.type2SearchQuery(nameQ, ratingQ);\r\n//                    break;\r\n//                case 3: // Search Type 3\r\n//                    // Business rating ≥ ratingQ AND reviewCount ≥ reviewCountQ\r\n//                    searchItems = publicFavoriteFacade.type3SearchQuery(ratingQ, reviewCountQ);\r\n//                    break;\r\n//                case 4: // Search Type 4\r\n//                    // City name contains cityQ AND rating ≥ ratingQ AND reviewCount ≥ reviewCountQ\r\n//                    searchItems = publicFavoriteFacade.type4SearchQuery(cityQ, ratingQ, reviewCountQ);\r\n//                    break;\r\n//                default:\r\n//                    Methods.showMessage(\"Fatal Error\", \"Search Type is Out of Range!\",\r\n//                            \"\");\r\n//            }\r\n//        }\r\n//        searchItems.sort(Comparator.comparing(PublicFavorite::getName));\r\n//        return searchItems;\r\n//    }\r\n\r\n    // Adds the Public Favorite to User Favorites if possible\r\n//    public void addToUserFavorites()\r\n//    {\r\n//        Methods.preserveMessages();\r\n//\r\n//        if (!userController.userIsSignedIn())\r\n//        {\r\n//            Methods.showMessage(\"Information\", \"Unable to Share!\",\r\n//                    \"To share a business, a user must have signed in!\");\r\n//        }\r\n//        else {\r\n//            UserFavorite newUserFavorite = userFavoriteController.prepareCreate();\r\n//\r\n//            newUserFavorite.setName(selected.getName());\r\n//            newUserFavorite.setImage(selected.getImage());\r\n//            newUserFavorite.setRating(selected.getRating());\r\n//            newUserFavorite.setReview_count(selected.getReview_count());\r\n//            newUserFavorite.setPhone(selected.getPhone());\r\n//            newUserFavorite.setWebsite(selected.getWebsite());\r\n//            newUserFavorite.setAddress1(selected.getAddress1());\r\n//            newUserFavorite.setAddress2(selected.getAddress2());\r\n//            newUserFavorite.setAddress3(selected.getAddress3());\r\n//            newUserFavorite.setCity(selected.getCity());\r\n//            newUserFavorite.setState(selected.getState());\r\n//            newUserFavorite.setZip_code(selected.getZip_code());\r\n//            newUserFavorite.setCountry(selected.getCountry());\r\n//            newUserFavorite.setLatitude(selected.getLatitude());\r\n//            newUserFavorite.setLongitude(selected.getLongitude());\r\n//\r\n//            userFavoriteController.create();\r\n//        }\r\n//    }\r\n//\r\n//    // Formats address to be displayed in list\r\n//    public String businessAddress(PublicFavorite aBusiness) {\r\n//        return Methods.addressFormatter(aBusiness.getAddress1(), aBusiness.getAddress2(), aBusiness.getAddress3(),\r\n//                aBusiness.getCity(), aBusiness.getState(), aBusiness.getZip_code(), aBusiness.getCountry());\r\n//    }\r\n\r\n    /*\r\n    Geocode method used for find locations and direcitons\r\n     */\r\n    public void geocode(String query) {\r\n\r\n        String cleanedQuery = query.replaceAll(\" \", \"+\");\r\n\r\n        String geocodingUrl = \"https://maps.googleapis.com/maps/api/geocode/json?address=\" +\r\n                cleanedQuery + \"&key=\" + Constants.GOOGLE_API_KEY;\r\n\r\n        Methods.preserveMessages();\r\n\r\n        try {\r\n            // Obtain the JSON file for geocodingUrl from Google Geocoding API\r\n            String searchResultsJsonData = Methods.readUrlContent(geocodingUrl);\r\n\r\n            /*\r\n             {\r\n             ✅\"results\" :\r\n               [\r\n                  {\r\n                     \"address_components\" : [...],\r\n                     \"formatted_address\" : \"2001 Carroll Dr, Blacksburg, VA 24060, USA\",\r\n                   ✅\"geometry\" : {\r\n                        \"bounds\" : {...},\r\n                      ✅\"location\" : {\r\n                         ✅\"lat\" : 37.25518630000001,\r\n                         ✅\"lng\" : -80.4183295\r\n                        },\r\n                        \"location_type\" : \"ROOFTOP\",\r\n                        \"viewport\" : {...}\r\n                     },\r\n                     \"place_id\" : \"ChIJMfS-09a_TYgR_cWtDLRormY\",\r\n                     \"types\" : [ \"premise\" ]\r\n                  }\r\n               ],\r\n               \"status\" : \"OK\"\r\n             }\r\n             */\r\n\r\n            // Create a new JSON object from the returned file\r\n            JSONObject searchResultsJsonObject = new JSONObject(searchResultsJsonData);\r\n            JSONArray resultsJsonArray = searchResultsJsonObject.getJSONArray(\"results\");\r\n            JSONObject aJsonObject = resultsJsonArray.getJSONObject(0);\r\n            JSONObject geometryJsonObject = aJsonObject.getJSONObject(\"geometry\");\r\n            JSONObject locationJsonObject = geometryJsonObject.getJSONObject(\"location\");\r\n\r\n            locationLatDouble = locationJsonObject.optDouble(\"lat\", 0.0);\r\n            locationLngDouble = locationJsonObject.optDouble(\"lng\", 0.0);\r\n\r\n            locationLatString = String.valueOf(locationLatDouble);\r\n            locationLngString = String.valueOf(locationLngDouble);\r\n\r\n        } catch (Exception ex) {\r\n            Methods.showMessage(\"Information\", \"Unable to Geocode!\",\r\n                    \"Google Geocoding API was unable to geocode the given query! Exception: \" + ex);\r\n            return;\r\n        }\r\n    }\r\n\r\n    /*\r\n    ***************************************\r\n    Set travel mode and determine start and\r\n    destination geolocations for directions\r\n    ***************************************\r\n     */\r\n    public String createStartAndDestinationPoints(int mode) {\r\n\r\n        Methods.preserveMessages();\r\n\r\n        // Set the travel mode according to the mode selected in Directions.xhtml\r\n        switch (mode) {\r\n            case 0:\r\n                travelMode = \"WALKING\";\r\n                travelModeCapitalized = \"Walking\";\r\n                break;\r\n            case 1:\r\n                travelMode = \"DRIVING\";\r\n                travelModeCapitalized = \"Driving\";\r\n                break;\r\n            case 2:\r\n                travelMode = \"BICYCLING\";\r\n                travelModeCapitalized = \"Bicycling\";\r\n                break;\r\n            default:\r\n                travelMode = \"TRANSIT\";\r\n                travelModeCapitalized = \"Transit\";\r\n                break;\r\n        }\r\n\r\n        /*\r\n        ------------------------------------------------------------------------\r\n        Starting geolocation determination for directions to START with\r\n        ------------------------------------------------------------------------\r\n         */\r\n        try {\r\n            geocode(startingAddress);\r\n            startingLat = locationLatDouble;\r\n            startingLng = locationLngDouble;\r\n\r\n        } catch (Exception ex) {\r\n            Methods.showMessage(\"Warning\", \"Directions Unavailable!\",\r\n                    \"Google API is unable to compute the requested directions!\");\r\n        }\r\n\r\n        /*\r\n        -------------------------------------------------------------------------\r\n        Destination geolocation determination for directions to END with\r\n        -------------------------------------------------------------------------\r\n         */\r\n        try {\r\n            geocode(selected.getGeoLocation());\r\n            destinationLat = locationLatDouble;\r\n            destinationLng = locationLngDouble;\r\n\r\n\r\n        } catch (Exception ex) {\r\n            Methods.showMessage(\"Warning\", \"Directions Unavailable!\",\r\n                    \"Google API is unable to compute the requested directions!\");\r\n        }\r\n\r\n        return \"/popularEvents/DirectionsOnMap?faces-redirect=true\";\r\n    }\r\n\r\n    /**\r\n     * Composes the initial content of the Email message.\r\n     *\r\n     * @return Email.xhtml\r\n     */\r\n    public String prepareEmailBody() {\r\n\r\n        // Compose the email message content in HTML format\r\n        String emailBodyText = \"<br /><div align=\\\"center\\\"><h1>\" + selected.getTitle() + \" Event Information</h1><br />\" +\r\n                \"<img src=\\\"\" + selected.getImageUrl() + \"\\\"><br /><br /><h3>Organization:</h3><p>\" + selected.getOrganization() +\r\n                \"</p><h3>Date:</h3><p>\" + selected.getDate() + \"</p><h3>Address:</h3><p>\" + selected.getAddress1() +\r\n                \"</p><p>\" + selected.getAddress2() + \"</p><p>\" + selected.getCity() + \", \" + selected.getState() + \" \" +\r\n                selected.getZipCode() + \"<p></div>\";\r\n\r\n        // Set the HTML content to be the body of the email message\r\n        editorController.setEmailMessage(emailBodyText);\r\n\r\n        // Redirect to show the Email.xhtml page\r\n        return \"/popularEvents/Email?faces-redirect=true\";\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/edu/vt/controllers/PopularEventController.java b/src/main/java/edu/vt/controllers/PopularEventController.java
+--- a/src/main/java/edu/vt/controllers/PopularEventController.java	(revision 1435315112d944bee9d438a1549133dea1738634)
++++ b/src/main/java/edu/vt/controllers/PopularEventController.java	(date 1714613231556)
+@@ -122,7 +122,11 @@
+     private Integer searchType;
+ 
+     // Search Query Variables (Q = Query)
+-
++    private String nameQ;
++    private String organizationQ;
++    private String descriptionQ;
++    private String cityQ;
++    private String dateQ;
+ 
+     // geocode() method below computes the following instance variables
+     private String locationLatString;
+@@ -209,10 +213,6 @@
+         this.popularEventDataChanged = popularEventDataChanged;
+     }
+ 
+-    public List<PopularEvent> getSearchItems() {
+-        return searchItems;
+-    }
+-
+     public void setSearchItems(List<PopularEvent> searchItems) {
+         this.searchItems = searchItems;
+     }
+@@ -225,6 +225,62 @@
+         this.searchType = searchType;
+     }
+ 
++    public OrganizationController getOrganizationController() {
++        return organizationController;
++    }
++
++    public void setOrganizationController(OrganizationController organizationController) {
++        this.organizationController = organizationController;
++    }
++
++    public EditorController getEditorController() {
++        return editorController;
++    }
++
++    public void setEditorController(EditorController editorController) {
++        this.editorController = editorController;
++    }
++
++    public String getNameQ() {
++        return nameQ;
++    }
++
++    public void setNameQ(String nameQ) {
++        this.nameQ = nameQ;
++    }
++
++    public String getOrganizationQ() {
++        return organizationQ;
++    }
++
++    public void setOrganizationQ(String organizationQ) {
++        this.organizationQ = organizationQ;
++    }
++
++    public String getDescriptionQ() {
++        return descriptionQ;
++    }
++
++    public void setDescriptionQ(String descriptionQ) {
++        this.descriptionQ = descriptionQ;
++    }
++
++    public String getCityQ() {
++        return cityQ;
++    }
++
++    public void setCityQ(String cityQ) {
++        this.cityQ = cityQ;
++    }
++
++    public String getDateQ() {
++        return dateQ;
++    }
++
++    public void setDateQ(String dateQ) {
++        this.dateQ = dateQ;
++    }
++
+     public UserEventFacade getUserEventFacade() {
+         return userEventFacade;
+     }
+@@ -582,98 +638,66 @@
+      ****************************************************************************************************
+      */
+     // This is the Getter method for the instance variable searchItems
+-//    public List<PublicFavorite> getSearchItems() {
+-//        /*
+-//        =============================================================================================
+-//        You must construct and return the search results List "searchItems" ONLY IF the List is null.
+-//        Any List provided to p:dataTable to display must be returned ONLY IF the List is null
+-//        ===> in order for the column-sort to work. <===
+-//        =============================================================================================
+-//         */
+-//        if (searchItems == null) {
+-//            switch (searchType) {
+-//                case 1: // Search Type 1
+-//                    switch (searchCategory) {
+-//                        case "Name":
+-//                            // Return the list of object references of all those businesses where
+-//                            // business name contains the searchString entered by the user.
+-//                            searchItems = publicFavoriteFacade.nameQuery(searchString);
+-//                            break;
+-//                        case "Address":
+-//                            // Return the list of object references of all those businesses where
+-//                            // address1 contains the searchString entered by the user.
+-//                            searchItems = publicFavoriteFacade.addressQuery(searchString);
+-//                            break;
+-//                        case "City":
+-//                            // Return the list of object references of all those businesses where
+-//                            // city contains the searchString entered by the user.
+-//                            searchItems = publicFavoriteFacade.cityQuery(searchString);
+-//                            break;
+-//                        default:
+-//                            // Return the list of object references of all those businesses where business name OR
+-//                            // address1 OR city contains the searchString entered by the user.
+-//                            searchItems = publicFavoriteFacade.allQuery(searchString);
+-//                    }
+-//                    break;
+-//                case 2: // Search Type 2
+-//                    // Business name contains nameQ AND rating ≥ ratingQ
+-//                    searchItems = publicFavoriteFacade.type2SearchQuery(nameQ, ratingQ);
+-//                    break;
+-//                case 3: // Search Type 3
+-//                    // Business rating ≥ ratingQ AND reviewCount ≥ reviewCountQ
+-//                    searchItems = publicFavoriteFacade.type3SearchQuery(ratingQ, reviewCountQ);
+-//                    break;
+-//                case 4: // Search Type 4
+-//                    // City name contains cityQ AND rating ≥ ratingQ AND reviewCount ≥ reviewCountQ
+-//                    searchItems = publicFavoriteFacade.type4SearchQuery(cityQ, ratingQ, reviewCountQ);
+-//                    break;
+-//                default:
+-//                    Methods.showMessage("Fatal Error", "Search Type is Out of Range!",
+-//                            "");
+-//            }
+-//        }
+-//        searchItems.sort(Comparator.comparing(PublicFavorite::getName));
+-//        return searchItems;
+-//    }
++    public List<PopularEvent> getSearchItems() {
++        /*
++        =============================================================================================
++        You must construct and return the search results List "searchItems" ONLY IF the List is null.
++        Any List provided to p:dataTable to display must be returned ONLY IF the List is null
++        ===> in order for the column-sort to work. <===
++        =============================================================================================
++         */
++        if (searchItems == null) {
++            switch (searchType) {
++                case 1: // Search Type 1
++                    switch (searchCategory) {
++                        case "Name":
++                            // Return the list of object references of all those businesses where
++                            // business name contains the searchString entered by the user.
++                            searchItems = popularEventFacade.nameQuery(searchString);
++                            break;
++                        case "Organization":
++                            // Return the list of object references of all those businesses where
++                            // address1 contains the searchString entered by the user.
++                            searchItems = popularEventFacade.organizationQuery(searchString);
++                            break;
++                        case "Description":
++                            // Return the list of object references of all those businesses where
++                            // address1 contains the searchString entered by the user.
++                            searchItems = popularEventFacade.descriptionQuery(searchString);
++                            break;
++                        case "City":
++                            // Return the list of object references of all those businesses where
++                            // city contains the searchString entered by the user.
++                            searchItems = popularEventFacade.cityQuery(searchString);
++                            break;
++                        default:
++                            // Return the list of object references of all those businesses where business name OR
++                            // address1 OR city contains the searchString entered by the user.
++                            searchItems = popularEventFacade.allQuery(searchString);
++                    }
++                    break;
++                case 2: // Search Type 2
++                    // Business name contains nameQ AND rating ≥ ratingQ
++                    searchItems = popularEventFacade.type2SearchQuery(nameQ, organizationQ);
++                    break;
++                case 3: // Search Type 3
++                    // Business rating ≥ ratingQ AND reviewCount ≥ reviewCountQ
++                    searchItems = popularEventFacade.type3SearchQuery(nameQ, cityQ);
++                    break;
++                case 4: // Search Type 4
++                    // City name contains cityQ AND rating ≥ ratingQ AND reviewCount ≥ reviewCountQ
++                    searchItems = popularEventFacade.type4SearchQuery(cityQ, descriptionQ);
++                    break;
++                default:
++                    Methods.showMessage("Fatal Error", "Search Type is Out of Range!",
++                            "");
++            }
++        }
++        searchItems.sort(Comparator.comparing(PopularEvent::getTitle));
++        return searchItems;
++    }
+ 
+-    // Adds the Public Favorite to User Favorites if possible
+-//    public void addToUserFavorites()
+-//    {
+-//        Methods.preserveMessages();
+-//
+-//        if (!userController.userIsSignedIn())
+-//        {
+-//            Methods.showMessage("Information", "Unable to Share!",
+-//                    "To share a business, a user must have signed in!");
+-//        }
+-//        else {
+-//            UserFavorite newUserFavorite = userFavoriteController.prepareCreate();
+-//
+-//            newUserFavorite.setName(selected.getName());
+-//            newUserFavorite.setImage(selected.getImage());
+-//            newUserFavorite.setRating(selected.getRating());
+-//            newUserFavorite.setReview_count(selected.getReview_count());
+-//            newUserFavorite.setPhone(selected.getPhone());
+-//            newUserFavorite.setWebsite(selected.getWebsite());
+-//            newUserFavorite.setAddress1(selected.getAddress1());
+-//            newUserFavorite.setAddress2(selected.getAddress2());
+-//            newUserFavorite.setAddress3(selected.getAddress3());
+-//            newUserFavorite.setCity(selected.getCity());
+-//            newUserFavorite.setState(selected.getState());
+-//            newUserFavorite.setZip_code(selected.getZip_code());
+-//            newUserFavorite.setCountry(selected.getCountry());
+-//            newUserFavorite.setLatitude(selected.getLatitude());
+-//            newUserFavorite.setLongitude(selected.getLongitude());
+-//
+-//            userFavoriteController.create();
+-//        }
+-//    }
+-//
+-//    // Formats address to be displayed in list
+-//    public String businessAddress(PublicFavorite aBusiness) {
+-//        return Methods.addressFormatter(aBusiness.getAddress1(), aBusiness.getAddress2(), aBusiness.getAddress3(),
+-//                aBusiness.getCity(), aBusiness.getState(), aBusiness.getZip_code(), aBusiness.getCountry());
+-//    }
++
+ 
+     /*
+     Geocode method used for find locations and direcitons
+Index: src/main/java/edu/vt/FacadeBeans/PopularEventFacade.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>/*\r\n * Created by Osman Balci and Tim Vadney on 2024.3.30\r\n * Copyright © 2024 Osman Balci and Tim Vadney. All rights reserved.\r\n */\r\npackage edu.vt.FacadeBeans;\r\n\r\nimport edu.vt.EntityBeans.Charity;\r\nimport edu.vt.EntityBeans.PopularEvent;\r\nimport jakarta.ejb.Stateless;\r\nimport jakarta.persistence.EntityManager;\r\nimport jakarta.persistence.PersistenceContext;\r\n\r\nimport java.util.List;\r\n\r\n// @Stateless annotation implies that the conversational state with the client shall NOT be maintained.\r\n@Stateless\r\npublic class PopularEventFacade extends AbstractFacade<PopularEvent> {\r\n    /*\r\n    ---------------------------------------------------------------------------------------------\r\n    The EntityManager is an API that enables database CRUD (Create Read Update Delete) operations\r\n    and complex database searches. An EntityManager instance is created to manage entities\r\n    that are defined by a persistence unit. The @PersistenceContext annotation below associates\r\n    the entityManager instance with the persistence unitName identified below.\r\n    ---------------------------------------------------------------------------------------------\r\n     */\r\n    @PersistenceContext(unitName = \"VolunteerMarketplacePU\")\r\n    private EntityManager entityManager;\r\n\r\n    // Obtain the object reference of the EntityManager instance in charge of\r\n    // managing the entities in the persistence context identified above.\r\n    @Override\r\n    protected EntityManager getEntityManager() {\r\n        return entityManager;\r\n    }\r\n\r\n    /*\r\n    This constructor method invokes its parent AbstractFacade's constructor method,\r\n    which in turn initializes its entity class type T and entityClass instance variable.\r\n     */\r\n    public PopularEventFacade() {\r\n        super(PopularEvent.class);\r\n    }\r\n\r\n//    /*\r\n//     ***************************\r\n//     *   Search Query Type 1   *\r\n//     ***************************\r\n//     */\r\n//\r\n//    /*\r\n//    -----------------------------\r\n//    Search Category: Business NAME\r\n//    -----------------------------\r\n//     */\r\n//    // Searches BusinessesDB for businesses where Business name contains the searchString entered by the user.\r\n//    public List<PublicFavorite> nameQuery(String searchString) {\r\n//        searchString = \"%\" + searchString + \"%\";\r\n//        // Conduct the search in a case-insensitive manner and return the results in a list.\r\n//        return getEntityManager().createQuery(\r\n//                        \"SELECT p FROM PublicFavorite p WHERE p.name LIKE :searchString\")\r\n//                .setParameter(\"searchString\", searchString)\r\n//                .getResultList();\r\n//    }\r\n//\r\n//    /*\r\n//    -----------------------------\r\n//    Search Category: Business Address\r\n//    -----------------------------\r\n//     */\r\n//    // Searches BusinessesDB for businesses where Business address1 contains the searchString entered by the user.\r\n//    public List<PublicFavorite> addressQuery(String searchString) {\r\n//        searchString = \"%\" + searchString + \"%\";\r\n//        // Conduct the search in a case-insensitive manner and return the results in a list.\r\n//        return getEntityManager().createQuery(\r\n//                        \"SELECT p FROM PublicFavorite p WHERE p.address1 LIKE :searchString\")\r\n//                .setParameter(\"searchString\", searchString)\r\n//                .getResultList();\r\n//    }\r\n//\r\n//    /*\r\n//    -----------------------------\r\n//    Search Category: Business City\r\n//    -----------------------------\r\n//     */\r\n//    // Searches BusinessesDB for businesses where Business city contains the searchString entered by the user.\r\n//    public List<PublicFavorite> cityQuery(String searchString) {\r\n//        searchString = \"%\" + searchString + \"%\";\r\n//        // Conduct the search in a case-insensitive manner and return the results in a list.\r\n//        return getEntityManager().createQuery(\r\n//                        \"SELECT p FROM PublicFavorite p WHERE p.city LIKE :searchString\")\r\n//                .setParameter(\"searchString\", searchString)\r\n//                .getResultList();\r\n//    }\r\n//\r\n//    /*\r\n//    --------------------\r\n//    Search Category: ALL\r\n//    --------------------\r\n//     */\r\n//    // Searches BusinessesDB for businesses where Business name OR address1 OR city contains the searchString entered by the user.\r\n//    public List<PublicFavorite> allQuery(String searchString) {\r\n//        searchString = \"%\" + searchString + \"%\";\r\n//        // Conduct the search in a case-insensitive manner and return the results in a list.\r\n//        return getEntityManager().createQuery(\r\n//                        \"SELECT p FROM PublicFavorite p WHERE p.name LIKE :searchString OR p.address1 LIKE :searchString OR p.city LIKE :searchString\")\r\n//                .setParameter(\"searchString\", searchString)\r\n//                .getResultList();\r\n//    }\r\n//\r\n//    /*\r\n//     ***************************\r\n//     *   Search Query Type 2   *\r\n//     ***************************\r\n//     */\r\n//    // Business name contains nameQ AND rating ≥ ratingQ\r\n//    public List<PublicFavorite> type2SearchQuery(String nameQ, Double ratingQ) {\r\n//\r\n//        nameQ = \"%\" + nameQ + \"%\";\r\n//\r\n//        return getEntityManager().createQuery(\r\n//                        \"SELECT p FROM PublicFavorite p WHERE p.name LIKE :nameQ AND p.rating >= :ratingQ\")\r\n//                .setParameter(\"nameQ\", nameQ)\r\n//                .setParameter(\"ratingQ\", ratingQ)\r\n//                .getResultList();\r\n//    }\r\n//\r\n//    /*\r\n//     ***************************\r\n//     *   Search Query Type 3   *\r\n//     ***************************\r\n//     */\r\n//    // Business rating ≥ ratingQ AND reviewCount ≥ reviewCountQ\r\n//    public List<PublicFavorite> type3SearchQuery(Double ratingQ, int reviewCountQ) {\r\n//\r\n//        return getEntityManager().createQuery(\r\n//                        \"SELECT p FROM PublicFavorite p WHERE p.rating >= :ratingQ AND p.review_count >= :reviewCountQ\")\r\n//                .setParameter(\"ratingQ\", ratingQ)\r\n//                .setParameter(\"reviewCountQ\", reviewCountQ)\r\n//                .getResultList();\r\n//    }\r\n//\r\n//    /*\r\n//     ***************************\r\n//     *   Search Query Type 4   *\r\n//     ***************************\r\n//     */\r\n//    // City name contains cityQ AND rating ≥ ratingQ AND reviewCount ≥ reviewCountQ\r\n//    public List<PublicFavorite> type4SearchQuery(String cityQ, Double ratingQ, int reviewCountQ) {\r\n//\r\n//        cityQ = \"%\" + cityQ + \"%\";\r\n//\r\n//        return getEntityManager().createQuery(\r\n//                        \"SELECT p FROM PublicFavorite p WHERE p.city LIKE :cityQ AND p.rating >= :ratingQ AND p.review_count >= :reviewCountQ\")\r\n//                .setParameter(\"cityQ\", cityQ)\r\n//                .setParameter(\"ratingQ\", ratingQ)\r\n//                .setParameter(\"reviewCountQ\", reviewCountQ)\r\n//                .getResultList();\r\n//    }\r\n\r\n    public PopularEvent findByName(String eventName)\r\n    {\r\n        /*\r\n        The following @NamedQuery definition is given in Cocktail.java entity class file:\r\n        @NamedQuery(name = \"Cocktail.findByName\", query = \"SELECT c FROM Cocktail c WHERE c.name = :name\")\r\n         */\r\n\r\n        if (entityManager.createNamedQuery(\"PopularEvent.findByName\")\r\n                .setParameter(\"title\", eventName)\r\n                .getResultList().isEmpty()) {\r\n\r\n            // Return null if no cocktail object exists by the name of cocktail_name\r\n            return null;\r\n\r\n        } else {\r\n\r\n            // Return the Object reference of the cocktail object whose name is cocktail_name\r\n            return (PopularEvent) (entityManager.createNamedQuery(\"PopularEvent.findByName\")\r\n                    .setParameter(\"title\", eventName)\r\n                    .getSingleResult());\r\n        }\r\n    }\r\n\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/edu/vt/FacadeBeans/PopularEventFacade.java b/src/main/java/edu/vt/FacadeBeans/PopularEventFacade.java
+--- a/src/main/java/edu/vt/FacadeBeans/PopularEventFacade.java	(revision 1435315112d944bee9d438a1549133dea1738634)
++++ b/src/main/java/edu/vt/FacadeBeans/PopularEventFacade.java	(date 1714609454333)
+@@ -10,6 +10,7 @@
+ import jakarta.persistence.EntityManager;
+ import jakarta.persistence.PersistenceContext;
+ 
++import java.sql.Date;
+ import java.util.List;
+ 
+ // @Stateless annotation implies that the conversational state with the client shall NOT be maintained.
+@@ -41,121 +42,138 @@
+         super(PopularEvent.class);
+     }
+ 
+-//    /*
+-//     ***************************
+-//     *   Search Query Type 1   *
+-//     ***************************
+-//     */
+-//
+-//    /*
+-//    -----------------------------
+-//    Search Category: Business NAME
+-//    -----------------------------
+-//     */
+-//    // Searches BusinessesDB for businesses where Business name contains the searchString entered by the user.
+-//    public List<PublicFavorite> nameQuery(String searchString) {
+-//        searchString = "%" + searchString + "%";
+-//        // Conduct the search in a case-insensitive manner and return the results in a list.
+-//        return getEntityManager().createQuery(
+-//                        "SELECT p FROM PublicFavorite p WHERE p.name LIKE :searchString")
+-//                .setParameter("searchString", searchString)
+-//                .getResultList();
+-//    }
+-//
+-//    /*
+-//    -----------------------------
+-//    Search Category: Business Address
+-//    -----------------------------
+-//     */
+-//    // Searches BusinessesDB for businesses where Business address1 contains the searchString entered by the user.
+-//    public List<PublicFavorite> addressQuery(String searchString) {
+-//        searchString = "%" + searchString + "%";
+-//        // Conduct the search in a case-insensitive manner and return the results in a list.
+-//        return getEntityManager().createQuery(
+-//                        "SELECT p FROM PublicFavorite p WHERE p.address1 LIKE :searchString")
+-//                .setParameter("searchString", searchString)
+-//                .getResultList();
+-//    }
+-//
+-//    /*
+-//    -----------------------------
+-//    Search Category: Business City
+-//    -----------------------------
+-//     */
+-//    // Searches BusinessesDB for businesses where Business city contains the searchString entered by the user.
+-//    public List<PublicFavorite> cityQuery(String searchString) {
+-//        searchString = "%" + searchString + "%";
+-//        // Conduct the search in a case-insensitive manner and return the results in a list.
+-//        return getEntityManager().createQuery(
+-//                        "SELECT p FROM PublicFavorite p WHERE p.city LIKE :searchString")
+-//                .setParameter("searchString", searchString)
+-//                .getResultList();
+-//    }
+-//
+-//    /*
+-//    --------------------
+-//    Search Category: ALL
+-//    --------------------
+-//     */
+-//    // Searches BusinessesDB for businesses where Business name OR address1 OR city contains the searchString entered by the user.
+-//    public List<PublicFavorite> allQuery(String searchString) {
+-//        searchString = "%" + searchString + "%";
+-//        // Conduct the search in a case-insensitive manner and return the results in a list.
+-//        return getEntityManager().createQuery(
+-//                        "SELECT p FROM PublicFavorite p WHERE p.name LIKE :searchString OR p.address1 LIKE :searchString OR p.city LIKE :searchString")
+-//                .setParameter("searchString", searchString)
+-//                .getResultList();
+-//    }
+-//
+-//    /*
+-//     ***************************
+-//     *   Search Query Type 2   *
+-//     ***************************
+-//     */
+-//    // Business name contains nameQ AND rating ≥ ratingQ
+-//    public List<PublicFavorite> type2SearchQuery(String nameQ, Double ratingQ) {
+-//
+-//        nameQ = "%" + nameQ + "%";
+-//
+-//        return getEntityManager().createQuery(
+-//                        "SELECT p FROM PublicFavorite p WHERE p.name LIKE :nameQ AND p.rating >= :ratingQ")
+-//                .setParameter("nameQ", nameQ)
+-//                .setParameter("ratingQ", ratingQ)
+-//                .getResultList();
+-//    }
+-//
+-//    /*
+-//     ***************************
+-//     *   Search Query Type 3   *
+-//     ***************************
+-//     */
+-//    // Business rating ≥ ratingQ AND reviewCount ≥ reviewCountQ
+-//    public List<PublicFavorite> type3SearchQuery(Double ratingQ, int reviewCountQ) {
+-//
+-//        return getEntityManager().createQuery(
+-//                        "SELECT p FROM PublicFavorite p WHERE p.rating >= :ratingQ AND p.review_count >= :reviewCountQ")
+-//                .setParameter("ratingQ", ratingQ)
+-//                .setParameter("reviewCountQ", reviewCountQ)
+-//                .getResultList();
+-//    }
+-//
+-//    /*
+-//     ***************************
+-//     *   Search Query Type 4   *
+-//     ***************************
+-//     */
+-//    // City name contains cityQ AND rating ≥ ratingQ AND reviewCount ≥ reviewCountQ
+-//    public List<PublicFavorite> type4SearchQuery(String cityQ, Double ratingQ, int reviewCountQ) {
+-//
+-//        cityQ = "%" + cityQ + "%";
+-//
+-//        return getEntityManager().createQuery(
+-//                        "SELECT p FROM PublicFavorite p WHERE p.city LIKE :cityQ AND p.rating >= :ratingQ AND p.review_count >= :reviewCountQ")
+-//                .setParameter("cityQ", cityQ)
+-//                .setParameter("ratingQ", ratingQ)
+-//                .setParameter("reviewCountQ", reviewCountQ)
+-//                .getResultList();
+-//    }
++    /*
++     ***************************
++     *   Search Query Type 1   *
++     ***************************
++     */
++
++    /*
++    -----------------------------
++    Search Category: Event NAME
++    -----------------------------
++     */
++    // Searches VolunteerMarketplaceDB for events where Event name contains the searchString entered by the user.
++    public List<PopularEvent> nameQuery(String searchString) {
++        searchString = "%" + searchString + "%";
++        // Conduct the search in a case-insensitive manner and return the results in a list.
++        return getEntityManager().createQuery(
++                        "SELECT p FROM PopularEvent p WHERE p.title LIKE :searchString")
++                .setParameter("searchString", searchString)
++                .getResultList();
++    }
++
++    /*
++    -----------------------------
++    Search Category: Event Organization
++    -----------------------------
++     */
++    // Searches BusinessesDB for businesses where Business address1 contains the searchString entered by the user.
++    public List<PopularEvent> organizationQuery(String searchString) {
++        searchString = "%" + searchString + "%";
++        // Conduct the search in a case-insensitive manner and return the results in a list.
++        return getEntityManager().createQuery(
++                        "SELECT p FROM PopularEvent p WHERE p.organization LIKE :searchString")
++                .setParameter("searchString", searchString)
++                .getResultList();
++    }
++
++    /*
++    -----------------------------
++    Search Category: Event Description
++    -----------------------------
++     */
++    // Searches BusinessesDB for businesses where Business city contains the searchString entered by the user.
++    public List<PopularEvent> descriptionQuery(String searchString) {
++        searchString = "%" + searchString + "%";
++        // Conduct the search in a case-insensitive manner and return the results in a list.
++        return getEntityManager().createQuery(
++                        "SELECT p FROM PopularEvent p WHERE p.description LIKE :searchString")
++                .setParameter("searchString", searchString)
++                .getResultList();
++    }
++
++    /*
++    -----------------------------
++    Search Category: Event Location
++    -----------------------------
++     */
++    // Searches BusinessesDB for businesses where Business city contains the searchString entered by the user.
++    public List<PopularEvent> cityQuery(String searchString) {
++        searchString = "%" + searchString + "%";
++        // Conduct the search in a case-insensitive manner and return the results in a list.
++        return getEntityManager().createQuery(
++                        "SELECT p FROM PopularEvent p WHERE p.city LIKE :searchString")
++                .setParameter("searchString", searchString)
++                .getResultList();
++    }
++
++    /*
++    --------------------
++    Search Category: ALL
++    --------------------
++     */
++    // Searches BusinessesDB for businesses where Business name OR address1 OR city contains the searchString entered by the user.
++    public List<PopularEvent> allQuery(String searchString) {
++        searchString = "%" + searchString + "%";
++        // Conduct the search in a case-insensitive manner and return the results in a list.
++        return getEntityManager().createQuery(
++                        "SELECT p FROM PopularEvent p WHERE p.title LIKE :searchString OR p.organization LIKE :searchString OR p.description LIKE :searchString OR p.city LIKE :searchString")
++                .setParameter("searchString", searchString)
++                .getResultList();
++    }
++
++    /*
++     ***************************
++     *   Search Query Type 2   *
++     ***************************
++     */
++    // Business name contains nameQ AND organization contains organizationQ
++    public List<PopularEvent> type2SearchQuery(String nameQ, String organizationQ) {
++
++        nameQ = "%" + nameQ + "%";
++        organizationQ = "%" + organizationQ + "%";
++
++        return getEntityManager().createQuery(
++                        "SELECT p FROM PopularEvent p WHERE p.title LIKE :nameQ AND p.organization LIKE :organizationQ")
++                .setParameter("nameQ", nameQ)
++                .setParameter("organizationQ", organizationQ)
++                .getResultList();
++    }
++
++    /*
++     ***************************
++     *   Search Query Type 3   *
++     ***************************
++     */
++    // Name contains nameQ AND city contains cityQ
++    public List<PopularEvent> type3SearchQuery(String nameQ, String cityQ) {
++
++        return getEntityManager().createQuery(
++                        "SELECT p FROM PopularEvent p WHERE p.title LIKE :nameQ AND p.city LIKE :cityQ")
++                .setParameter("nameQ", nameQ)
++                .setParameter("cityQ", cityQ)
++                .getResultList();
++    }
++
++    /*
++     ***************************
++     *   Search Query Type 4   *
++     ***************************
++     */
++    // City contains cityQ AND Date contains dateQ AND Description contains descriptionQ
++    public List<PopularEvent> type4SearchQuery(String cityQ, String descriptionQ) {
++
++        cityQ = "%" + cityQ + "%";
++        descriptionQ = "%" + descriptionQ + "%";
++
++
++        return getEntityManager().createQuery(
++                        "SELECT p FROM PopularEvent p WHERE p.city LIKE :cityQ AND p.description LIKE :descriptionQ")
++                .setParameter("cityQ", cityQ)
++                .setParameter("descriptionQ", descriptionQ)
++                .getResultList();
++    }
+ 
+     public PopularEvent findByName(String eventName)
+     {
+Index: src/main/webapp/popularEvents/List.xhtml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\" ?>\r\n<!--\r\n  - Created by Osman Balci on 2024.2.8\r\n  - Copyright © 2024 Osman Balci. All rights reserved.\r\n  -->\r\n<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\"\r\n        \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\r\n<html xmlns=\"http://www.w3.org/1999/xhtml\"\r\n      xmlns:ui=\"jakarta.faces.facelets\"\r\n      xmlns:h=\"jakarta.faces.html\"\r\n      xmlns:f=\"jakarta.faces.core\"\r\n      xmlns:p=\"http://primefaces.org/ui\"\r\n      xmlns:c=\"jakarta.tags.core\">\r\n\r\n<!-- This page is constructed based on the siteTemplate -->\r\n<ui:composition template=\"/template/siteTemplate.xhtml\">\r\n    <ui:define name=\"title\">\r\n        <!-- Set the page title -->\r\n        <h:outputText value=\"Popular Events\"/>\r\n    </ui:define>\r\n\r\n    <!-- Create the content for this page below -->\r\n    <ui:define name=\"editableContent\">\r\n\r\n        <!-- In case of Jakarta Faces validation error, set 'selected' to null in countryApiController -->\r\n        <c:if test=\"#{facesContext.validationFailed}\">\r\n            ${popularEventController.unselect()}\r\n        </c:if>\r\n\r\n        <!-- Set 'selected' to null in countryApiController when the user refreshes / reloads this Jakarta Faces page -->\r\n        <f:metadata>\r\n            <f:viewAction action=\"#{popularEventController.unselect()}\" rendered=\"#{facesContext.postback}\"/>\r\n        </f:metadata>\r\n\r\n        <div align=\"center\">\r\n            <c:if test=\"#{userController.userIsSignedIn() == false and organizationController.organizationIsSignedIn() == false}\">\r\n                <h1 style=\"font-size: 30px; font-style: oblique\">To sign up to volunteer, please create an account or sign in!</h1>\r\n            </c:if>\r\n            <h:form id=\"PopularEventsListForm\">\r\n                <p:panel header=\"Popular Events\">\r\n                    <p:dataTable id=\"datalist\"\r\n                                 value=\"#{popularEventController.listOfPopularEvents}\"\r\n                                 var=\"aEvent\"\r\n                                 widgetVar=\"popularEventsDataTable\"\r\n                                 selectionMode=\"single\"\r\n                                 selection=\"#{popularEventController.selected}\"\r\n                                 reflow=\"true\"\r\n                                 showGridlines=\"true\"\r\n                                 paginator=\"true\"\r\n                                 rowKey=\"#{aEvent.id}\"\r\n                                 rows=\"5\"\r\n                                 rowsPerPageTemplate=\"5,10,20,30,50,70,90\">\r\n\r\n\r\n\r\n                        <p:ajax event=\"rowSelect\" update=\"viewButton mapButton directionsButton\"/>\r\n                        <p:ajax event=\"rowUnselect\" update=\"viewButton mapButton directionsButton\"/>\r\n\r\n                        <c:if test=\"#{organizationController.organizationIsSignedIn() == true}\">\r\n                            <p:ajax event=\"rowSelect\" update=\"createButton editButton deleteButton\"/>\r\n                            <p:ajax event=\"rowUnselect\" update=\"createButton editButton deleteButton\"/>\r\n                        </c:if>\r\n\r\n                        <c:if test=\"#{userController.userIsSignedIn() == true}\">\r\n                            <p:ajax event=\"rowSelect\" update=\"signUpButton\"/>\r\n                            <p:ajax event=\"rowUnselect\" update=\"signUpButton\"/>\r\n                        </c:if>\r\n\r\n\r\n                        <!--\r\n                        *********************\r\n                        *    Event Logo   *\r\n                        *********************\r\n                        Country code must be in lower case for the flag URL\r\n                        -->\r\n                        <p:column headerText=\"Logo\" style=\"width: 60px; text-align: center; vertical-align: top\">\r\n                            <img src=\"#{aEvent.imageUrl}\"\r\n                                 alt=\"Event Logo\" width=\"60px\" height=\"60px\"/>\r\n                        </p:column>\r\n\r\n                        <!--\r\n                        *********************\r\n                        *  Event Organization   *\r\n                        *********************\r\n                        -->\r\n                        <p:column headerText=\"Organization\" sortBy=\"#{aEvent.organization}\"\r\n                                  style=\"vertical-align: top; width: 200px;\">\r\n                            <h:outputText value=\"#{aEvent.organization}\"/>\r\n                        </p:column>\r\n\r\n                        <!--\r\n                        *********************\r\n                        *    Event Name   *\r\n                        *********************\r\n                        -->\r\n                        <p:column headerText=\"Event Name\" sortBy=\"#{aEvent.title}\"\r\n                                  style=\"vertical-align: top; width: 200px;\">\r\n                            <h:outputText value=\"#{aEvent.title}\"/>\r\n                        </p:column>\r\n\r\n                        <!--\r\n                        ******************************\r\n                        *    Event Description   *\r\n                        ******************************\r\n                        -->\r\n                        <p:column headerText=\"Description\" sortBy=\"#{aEvent.description}\"\r\n                                  style=\"vertical-align: top\">\r\n                            <h:outputText value=\"#{aEvent.description}\"/>\r\n                        </p:column>\r\n\r\n                        <!--\r\n                        *********************\r\n                        *  Event Location *\r\n                        *********************\r\n                        -->\r\n                        <p:column headerText=\"Location\" sortBy=\"#{aEvent.location}\"\r\n                                  style=\"vertical-align: top; text-align: center; width: 150px\">\r\n                            <h:outputText value=\"#{aEvent.location}\"/>\r\n                        </p:column>\r\n\r\n                        <!--\r\n                        *********************\r\n                        *  Event Date  *\r\n                        *********************\r\n                        -->\r\n                        <p:column headerText=\"Date\" sortBy=\"#{aEvent.date}\"\r\n                                  style=\"vertical-align: top; text-align: center; width: 150px\">\r\n                            <h:outputText value=\"#{aEvent.date}\">\r\n                                <f:convertDateTime pattern=\"MM/dd/yyyy\" />\r\n                            </h:outputText>\r\n                        </p:column>\r\n\r\n                        <!--\r\n                        *************************\r\n                        *   Data Table Footer   *\r\n                        *************************\r\n                        -->\r\n                        <f:facet name=\"footer\">\r\n                            <div align=\"center\">\r\n                                <!-- VIEW button: id is used since it is referenced to be activated or deactivated -->\r\n                                <p:commandButton id=\"viewButton\" value=\"View\" icon=\"fas fa-eye\" styleClass=\"rounded-button\"\r\n                                                 update=\":EventViewDlg\" oncomplete=\"PF('EventViewDialog').show()\"\r\n                                                 disabled=\"#{empty popularEventController.selected}\"/>\r\n                                &nbsp;\r\n                                <!-- MAP button: id is used since it is referenced to be activated or deactivated -->\r\n                                <p:commandButton id=\"mapButton\" value=\"Show on Map\" icon=\"fas fa-map-location-dot\" styleClass=\"rounded-button\"\r\n                                                 action=\"/popularEvents/LocationOnMap?faces-redirect=true\" disabled=\"#{empty popularEventController.selected}\"\r\n                                                 actionListener=\"#{popularEventController.geocode(popularEventController.selected.geoLocation)}\"/>\r\n                                &nbsp;\r\n                                <!-- DIRECTIONS button: id is used since it is referenced to be activated or deactivated -->\r\n                                <p:commandButton id=\"directionsButton\" value=\"Get Directions\" icon=\"fas fa-diamond-turn-right\" styleClass=\"rounded-button\"\r\n                                                 action=\"/popularEvents/Directions?faces-redirect=true\" disabled=\"#{empty popularEventController.selected}\"/>\r\n                                &nbsp;\r\n                                <c:if test=\"#{organizationController.organizationIsSignedIn() == true}\">\r\n                                    <!-- CREATE button: id is used since it is referenced to be activated or deactivated -->\r\n                                    <p:commandButton id=\"createButton\" value=\"Create\" icon=\"fas fa-plus\" styleClass=\"rounded-button\"\r\n                                                 actionListener=\"#{popularEventController.prepareCreate()}\"\r\n                                                 update=\":EventCreateForm\" oncomplete=\"PF('EventCreateDialog').show()\"\r\n                                                     disabled=\"#{empty popularEventController.selected}\"/>\r\n                                    &nbsp;\r\n                                    <!-- EDIT button: id is used since it is referenced to be activated or deactivated -->\r\n                                    <p:commandButton id=\"editButton\" value=\"Edit\" icon=\"fas fa-edit\" styleClass=\"rounded-button\"\r\n                                                 update=\":EventEditDlg\" oncomplete=\"PF('EventEditDialog').show()\"\r\n                                                 disabled=\"#{empty popularEventController.selected}\"/>\r\n                                    &nbsp;\r\n                                    <!-- ***************************************************\r\n                                    Display a Confirmation dialog for the DELETE button\r\n                                    id is used since it is referenced to be activated or not\r\n                                    **************************************************** -->\r\n                                    <p:commandButton id=\"deleteButton\" value=\"Delete\" icon=\"fas fa-trash-alt\"  styleClass=\"rounded-button\"\r\n                                                 actionListener=\"#{popularEventController.destroy()}\"\r\n                                                 update=\"datalist,:growlInfoMessage,:growlWarningMessage,:growlErrorMessage,:growlFatalMessage\"\r\n                                                 disabled=\"#{empty popularEventController.selected}\">\r\n\r\n                                        <p:confirm header=\"Deletion Confirmation\"\r\n                                               message=\"Are you sure you want to permanently delete the selected event #{popularEventController.selected.title} from the database?\"/>\r\n                                    </p:commandButton>\r\n\r\n\r\n                                    <p:confirmDialog id=\"confirmDialogBox\" global=\"true\" showEffect=\"fade\" hideEffect=\"fade\" responsive=\"true\" width=\"350\">\r\n                                        <div align=\"center\">\r\n                                            <p:commandButton value=\"No\" type=\"button\" styleClass=\"ui-confirmdialog-no\" icon=\"fas fa-window-close\" />\r\n                                            &nbsp;\r\n                                            <p:commandButton value=\"Yes\" type=\"button\" class=\"ui-confirmdialog-yes ui-button-danger\" icon=\"fas fa-check-square\" />\r\n                                        </div>\r\n                                    </p:confirmDialog>\r\n                                </c:if>\r\n                                &nbsp;\r\n                                <!-- SIGN UP button: id is used since it is referenced to be activated or deactivated -->\r\n                                <c:if test=\"#{userController.userIsSignedIn() == true}\">\r\n                                    <p:commandButton id=\"signUpButton\" value=\"Sign Up\" icon=\"fa-regular fa-pen-to-square\" styleClass=\"rounded-button\"\r\n                                                     onclick=\"window.open('#{popularEventController.selected.websiteUrl}', '_blank');\"\r\n                                                     oncomplete=\"PF('EventCheckSignUpDialog').show()\" update=\":EventCheckSignUpDlg\"\r\n                                                     disabled=\"#{empty popularEventController.selected}\">\r\n                                    </p:commandButton>\r\n                                </c:if>\r\n\r\n                            </div>\r\n                        </f:facet>\r\n                    </p:dataTable>\r\n                </p:panel>\r\n            </h:form>\r\n        </div>\r\n        <!-- Clicking the Create button displays the included Create.xhtml file in a dialog window on top of this page. -->\r\n        <ui:include src=\"/popularEvents/Create.xhtml\"/>\r\n\r\n        <!-- Clicking the View button displays the included View.xhtml file in a dialog window on top of this page. -->\r\n        <ui:include src=\"/popularEvents/View.xhtml\"/>\r\n\r\n        <!-- Clicking the EDit button displays the included Edit.xhtml file in a dialog window on top of this page. -->\r\n        <ui:include src=\"/popularEvents/Edit.xhtml\"/>\r\n\r\n        <!-- Clicking the Sign Up button displays the included CheckSignUp.xhtml file in a dialog window on top of this page. -->\r\n        <ui:include src=\"/popularEvents/CheckSignUp.xhtml\"/>\r\n\r\n\r\n    </ui:define>\r\n</ui:composition>\r\n</html>\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/webapp/popularEvents/List.xhtml b/src/main/webapp/popularEvents/List.xhtml
+--- a/src/main/webapp/popularEvents/List.xhtml	(revision 1435315112d944bee9d438a1549133dea1738634)
++++ b/src/main/webapp/popularEvents/List.xhtml	(date 1714613441758)
+@@ -155,8 +155,7 @@
+                                     <!-- CREATE button: id is used since it is referenced to be activated or deactivated -->
+                                     <p:commandButton id="createButton" value="Create" icon="fas fa-plus" styleClass="rounded-button"
+                                                  actionListener="#{popularEventController.prepareCreate()}"
+-                                                 update=":EventCreateForm" oncomplete="PF('EventCreateDialog').show()"
+-                                                     disabled="#{empty popularEventController.selected}"/>
++                                                 update=":EventCreateForm" oncomplete="PF('EventCreateDialog').show()"/>
+                                     &nbsp;
+                                     <!-- EDIT button: id is used since it is referenced to be activated or deactivated -->
+                                     <p:commandButton id="editButton" value="Edit" icon="fas fa-edit" styleClass="rounded-button"
+Index: src/main/webapp/template/headerTemplate.xhtml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<!--\r\n  - Created by Osman Balci on 2024.3.22\r\n  - Copyright © 2024 Osman Balci. All rights reserved.\r\n  -->\r\n<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\"\r\n        \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\r\n<html xmlns=\"http://www.w3.org/1999/xhtml\"\r\n      xmlns:h=\"jakarta.faces.html\"\r\n      xmlns:ui=\"jakarta.faces.facelets\"\r\n      xmlns:c=\"jakarta.tags.core\"\r\n      xmlns:p=\"http://primefaces.org/ui\">\r\n\r\n<!--\r\n*********************************************\r\n* Header Component of Template siteTemplate *\r\n*********************************************\r\nThis page's content is displayed on the top of each page created based on the siteTemplate.\r\nChanges made in this file will show up automatically with all pages created based on the\r\nsiteTemplate for the entire site, achieving great maintainability.\r\n-->\r\n\r\n<ui:composition>\r\n    <h:form>\r\n        <table border=\"0\" cellspacing=\"0\" cellpadding=\"10\" width=\"100%\">\r\n            <tr>\r\n                <!--\r\n                The widths of Column 1 and 3 must be set as fixed so that Column 2 can center its content.\r\n                *****************************************\r\n                Column 1 (Left): VolunteerMarketplace Logo Image\r\n                *****************************************\r\n                -->\r\n                <td align=\"left\" valign=\"middle\" style=\"width:200px;\">\r\n                    <!--\r\n                        Use EL to reference the image file since it will be accessed from all UI pages.\r\n                        Column width = Logo Image Width\r\n                        -->\r\n                    <h:link outcome=\"/index\">\r\n                        <img src=\"#{resource['images:VolunteerLogo.png']}\"\r\n                             style=\"height:70px; width:auto; float:left; padding-left:10px; border:none;\"\r\n                             alt=\"Volunteer Logo\" />\r\n                    </h:link>\r\n                </td>\r\n                <!--\r\n                *******************************\r\n                Column 2 (Center): Welcome User\r\n                *******************************\r\n                -->\r\n                <td align=\"center\" valign=\"middle\">\r\n                    <!-- Welcome the user if signed in -->\r\n                    <c:if test=\"#{userController.userIsSignedIn() == true}\">\r\n                        <c:if test=\"#{organizationController.organizationIsSignedIn() == true}\">\r\n                            <span class=\"headerTitle\" style=\"font-size:30px\">Hello, #{userController.signedInUser.firstName} with #{organizationController.signedInOrganization.name}</span>\r\n                        </c:if>\r\n                        <c:if test=\"#{organizationController.organizationIsSignedIn() == false}\">\r\n                            <span class=\"headerTitle\" style=\"font-size:30px\">Hello, #{userController.signedInUser.firstName}</span>\r\n                        </c:if>\r\n                    </c:if>\r\n                    <c:if test=\"#{userController.userIsSignedIn() == false}\">\r\n                        <c:if test=\"#{organizationController.organizationIsSignedIn() == true}\">\r\n                            <span class=\"headerTitle\" style=\"font-size:30px\">Hello, Guest with #{organizationController.signedInOrganization.name}</span>\r\n                        </c:if>\r\n                        <c:if test=\"#{organizationController.organizationIsSignedIn() == false}\">\r\n                            <span class=\"headerTitle\" style=\"font-size:30px\">Hello, Guest</span>\r\n                        </c:if>\r\n                    </c:if>\r\n                </td>\r\n                <!--\r\n                ***************************************\r\n                Column 3 (Right): Hamburger Menu Button\r\n                ***************************************\r\n                -->\r\n                <td align=\"right\" valign=\"middle\" style=\"width:100px;\">\r\n                    <div style=\"padding-right:10px\">\r\n                        <p:commandButton id=\"dynaButton\" value=\"Menu\" type=\"button\" icon=\"pi pi-bars\"/>\r\n                        <p:menu overlay=\"true\" trigger=\"dynaButton\" my=\"left top\" at=\"left bottom\" style=\"white-space: nowrap;\">\r\n                            <p:menuitem value=\"Home\" outcome=\"/index\" icon=\"fas fa-home\"/>\r\n                            <p:menuitem value=\"Popular Events\" outcome=\"/popularEvents/List\" icon=\"fa-solid fa-arrow-trend-up\"/>\r\n                            <p:menuitem value=\"Charity Search\" onclick=\"PF('CharitySearchDialog').show();return false;\" icon=\"fa-solid fa-hand-holding-heart\"/>\r\n                            <p:menuitem value=\"Organizations List\" outcome=\"/organization/List\" icon=\"fas fa-list\"/>\r\n\r\n                            <!-- Menu Options IF a User is Signed In -->\r\n                            <c:if test=\"#{userController.userIsSignedIn() == true}\">\r\n                                <p:menuitem value=\"My Events\" outcome=\"/userEvents/List\" icon=\"fa-solid fa-star\" />\r\n                                <p:menuitem value=\"My Charities\" outcome=\"/userCharities/List\" icon=\"fa-regular fa-star\" />\r\n\r\n                                <p:menuitem outcome=\"/userAccount/Profile\">\r\n                                    <p:graphicImage cache=\"false\" styleClass=\"smallProfilePhoto\" value=\"#{userController.userPhoto()}\" />\r\n                                    &nbsp;My Account\r\n                                </p:menuitem>\r\n\r\n                                <p:menuitem value=\"Sign Out\" action=\"#{userController.logout()}\" icon=\"fas fa-sign-out-alt\" />\r\n                            </c:if>\r\n\r\n                            <!-- Menu Options IF No User is Signed In -->\r\n                            <c:if test=\"#{userController.userIsSignedIn() == false}\">\r\n                                <p:menuitem value=\"Sign In\" outcome=\"/signIn/SignIn\" icon=\"fas fa-sign-in-alt\" />\r\n                                <p:menuitem value=\"Create Account\" outcome=\"/userAccount/CreateAccount\" icon=\"fas fa-user-plus\" />\r\n                            </c:if>\r\n\r\n                            <!-- Menu Options IF Organization signed in -->\r\n                            <c:if test=\"#{organizationController.organizationIsSignedIn() == true}\">\r\n\r\n                                <p:menuitem outcome=\"/organization/Organization\">\r\n                                    <p:graphicImage cache=\"false\" styleClass=\"smallProfilePhoto\" value=\"#{organizationController.organizationPhoto(organizationController.signedInOrganization.id)}\" />\r\n                                    &nbsp;Organization Account\r\n                                </p:menuitem>\r\n\r\n                                <p:menuitem value=\"Sign Out of Organization\" action=\"#{organizationController.logout()}\" icon=\"fas fa-sign-out-alt\" />\r\n                            </c:if>\r\n\r\n                        </p:menu>\r\n                    </div>\r\n                </td>\r\n            </tr>\r\n        </table>\r\n    </h:form>\r\n    <!-- Selecting Movie Search from the hamburger menu displays the included SearchMovies.xhtml file in a dialog box on top of this page. -->\r\n    <ui:include src=\"/apiSearch/ApiSearch.xhtml\"/>\r\n</ui:composition>\r\n</html>\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/webapp/template/headerTemplate.xhtml b/src/main/webapp/template/headerTemplate.xhtml
+--- a/src/main/webapp/template/headerTemplate.xhtml	(revision 1435315112d944bee9d438a1549133dea1738634)
++++ b/src/main/webapp/template/headerTemplate.xhtml	(date 1714608018749)
+@@ -73,9 +73,12 @@
+                 <td align="right" valign="middle" style="width:100px;">
+                     <div style="padding-right:10px">
+                         <p:commandButton id="dynaButton" value="Menu" type="button" icon="pi pi-bars"/>
+-                        <p:menu overlay="true" trigger="dynaButton" my="left top" at="left bottom" style="white-space: nowrap;">
++                        <p:tieredMenu overlay="true" trigger="dynaButton" my="left top" at="left bottom" style="white-space: nowrap;">
+                             <p:menuitem value="Home" outcome="/index" icon="fas fa-home"/>
+-                            <p:menuitem value="Popular Events" outcome="/popularEvents/List" icon="fa-solid fa-arrow-trend-up"/>
++                            <p:submenu label="Find Events" icon="fa-solid fa-handshake-angle">
++                                <p:menuitem value="Popular Events" outcome="/popularEvents/List" icon="fa-solid fa-arrow-trend-up"/>
++                                <p:menuitem value="Events Search" outcome="/databaseSearch/DatabaseSearch" icon="fas fa-database"/>
++                            </p:submenu>
+                             <p:menuitem value="Charity Search" onclick="PF('CharitySearchDialog').show();return false;" icon="fa-solid fa-hand-holding-heart"/>
+                             <p:menuitem value="Organizations List" outcome="/organization/List" icon="fas fa-list"/>
+ 
+@@ -109,7 +112,7 @@
+                                 <p:menuitem value="Sign Out of Organization" action="#{organizationController.logout()}" icon="fas fa-sign-out-alt" />
+                             </c:if>
+ 
+-                        </p:menu>
++                        </p:tieredMenu>
+                     </div>
+                 </td>
+             </tr>
+Index: src/main/webapp/databaseSearch/DatabaseSearchResults.xhtml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/webapp/databaseSearch/DatabaseSearchResults.xhtml b/src/main/webapp/databaseSearch/DatabaseSearchResults.xhtml
+new file mode 100644
+--- /dev/null	(date 1714610801711)
++++ b/src/main/webapp/databaseSearch/DatabaseSearchResults.xhtml	(date 1714610801711)
+@@ -0,0 +1,148 @@
++<?xml version="1.0" encoding="UTF-8" ?>
++<!--
++  - Created by Osman Balci and Tim Vadney on 2024.3.18
++  - Copyright © 2024 Osman Balci and Tim Vadney. All rights reserved.
++  -->
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
++<html xmlns="http://www.w3.org/1999/xhtml"
++      xmlns:ui="jakarta.faces.facelets"
++      xmlns:h="jakarta.faces.html"
++      xmlns:f="jakarta.faces.core"
++      xmlns:p="http://primefaces.org/ui"
++      xmlns:c="jakarta.tags.core">
++
++<!-- This page is constructed based on the siteTemplate -->
++<ui:composition template="/template/siteTemplate.xhtml">
++    <ui:define name="title">
++        <!-- Set the page title -->
++        <h:outputText value="Database Search Results"/>
++    </ui:define>
++
++    <!-- Create the content for this page below -->
++    <ui:define name="editableContent">
++
++        <!-- In case of Jakarta Faces validation error, set 'selected' to null in cocktailController -->
++        <c:if test="#{facesContext.validationFailed}">
++            ${popularEventController.unselect()}
++        </c:if>
++
++        <!-- Set 'selected' to null in cocktailController when the user refreshes / reloads this Jakarta Faces page -->
++        <f:metadata>
++            <f:viewAction action="#{popularEventController.unselect()}" rendered="#{facesContext.postback}" />
++        </f:metadata>
++
++        <div align="center">
++            <h:form id="SearchEventListForm">
++                <p:panel header="Database Search Results">
++                    <p:dataTable id="datalist"
++                                 value="#{popularEventController.searchItems}"
++                                 var="aEvent"
++                                 widgetVar="EventDataTable"
++                                 selectionMode="single"
++                                 selection="#{popularEventController.selected}"
++                                 reflow="true"
++                                 showGridlines="true"
++                                 paginator="true"
++                                 rowKey="#{aEvent.id}"
++                                 rows="5"
++                                 rowsPerPageTemplate="5,10,20,30,50,70,90"
++                                 emptyMessage="No records found.">
++
++                        <p:ajax event="rowSelect"   update="viewButton backButton"/>
++                        <p:ajax event="rowUnselect" update="viewButton backButton"/>
++
++                        <!--
++                        *********************
++                        *    Event Logo   *
++                        *********************
++                        Country code must be in lower case for the flag URL
++                        -->
++                        <p:column headerText="Logo" style="width: 60px; text-align: center; vertical-align: top">
++                            <img src="#{aEvent.imageUrl}"
++                                 alt="Event Logo" width="60px" height="60px"/>
++                        </p:column>
++
++                        <!--
++                        *********************
++                        *  Event Organization   *
++                        *********************
++                        -->
++                        <p:column headerText="Organization" sortBy="#{aEvent.organization}"
++                                  style="vertical-align: top; width: 200px;">
++                            <h:outputText value="#{aEvent.organization}"/>
++                        </p:column>
++
++                        <!--
++                        *********************
++                        *    Event Name   *
++                        *********************
++                        -->
++                        <p:column headerText="Event Name" sortBy="#{aEvent.title}"
++                                  style="vertical-align: top; width: 200px;">
++                            <h:outputText value="#{aEvent.title}"/>
++                        </p:column>
++
++                        <!--
++                        ******************************
++                        *    Event Description   *
++                        ******************************
++                        -->
++                        <p:column headerText="Description" sortBy="#{aEvent.description}"
++                                  style="vertical-align: top">
++                            <h:outputText value="#{aEvent.description}"/>
++                        </p:column>
++
++                        <!--
++                        *********************
++                        *  Event Location *
++                        *********************
++                        -->
++                        <p:column headerText="Location" sortBy="#{aEvent.location}"
++                                  style="vertical-align: top; text-align: center; width: 150px">
++                            <h:outputText value="#{aEvent.location}"/>
++                        </p:column>
++
++                        <!--
++                        *********************
++                        *  Event Date  *
++                        *********************
++                        -->
++                        <p:column headerText="Date" sortBy="#{aEvent.date}"
++                                  style="vertical-align: top; text-align: center; width: 150px">
++                            <h:outputText value="#{aEvent.date}">
++                                <f:convertDateTime pattern="MM/dd/yyyy" />
++                            </h:outputText>
++                        </p:column>
++
++
++
++                        <!--
++                        *************************
++                        *   Data Table Footer   *
++                        *************************
++                        -->
++                        <f:facet name="footer">
++                            <div align="center">
++                                <!-- VIEW button: id is used since it is referenced to be activated or deactivated -->
++                                <p:commandButton id="viewButton" value="View" icon="fas fa-eye" styleClass="rounded-button"
++                                                 update=":EventViewDlg" oncomplete="PF('EventViewDialog').show()"
++                                                 disabled="#{empty popularEventController.selected}"/>
++                                &nbsp;
++                                <!-- GO BACK button -->
++                                <p:button id="backButton" icon="fas fa-arrow-left" styleClass="ui-button-outlined"
++                                          outcome="/databaseSearch/DatabaseSearch" value="Go Back"/>
++
++                            </div>
++                        </f:facet>
++                    </p:dataTable>
++                </p:panel>
++            </h:form>
++        </div>
++
++        <!-- Clicking the View button displays the included View.xhtml file in a dialog window on top of this page. -->
++        <ui:include src="/popularEvents/View.xhtml"/>
++
++
++    </ui:define>
++</ui:composition>
++</html>
+Index: src/main/webapp/databaseSearch/DatabaseSearch.xhtml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/webapp/databaseSearch/DatabaseSearch.xhtml b/src/main/webapp/databaseSearch/DatabaseSearch.xhtml
+new file mode 100644
+--- /dev/null	(date 1714609395885)
++++ b/src/main/webapp/databaseSearch/DatabaseSearch.xhtml	(date 1714609395885)
+@@ -0,0 +1,249 @@
++<?xml version="1.0" encoding="UTF-8" ?>
++<!--
++  - Created by Osman Balci and Tim Vadney on 2024.3.18
++  - Copyright © 2024 Osman Balci and Tim Vadney. All rights reserved.
++  -->
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
++<html xmlns="http://www.w3.org/1999/xhtml"
++      xmlns:ui="jakarta.faces.facelets"
++      xmlns:h="jakarta.faces.html"
++      xmlns:f="jakarta.faces.core"
++      xmlns:p="http://primefaces.org/ui">
++
++<!-- This page is constructed based on the siteTemplate -->
++<ui:composition template="/template/siteTemplate.xhtml">
++
++    <ui:define name="title">
++        <!-- Set the page title -->
++        <h:outputText value="Database Search"/>
++    </ui:define>
++
++    <!-- Create the content for this page below -->
++    <ui:define name="editableContent">
++
++        <h:form id="DatabaseSearchForm">
++            <div align="center">
++                <h:graphicImage value="#{resource['images:SearchDatabaseIcon.png']}"
++                                style="width: 150px" />
++                <h1>Events Database Search</h1>
++                <br />
++                <table width="80%" border="1" align="center" cellpadding="5" cellspacing="0">
++                    <tbody>
++                    <tr>
++                        <th width="60" nowrap="nowrap" scope="col">Type</th>
++                        <th scope="col">Description</th>
++                        <th width="200" scope="col">Search</th>
++                    </tr>
++                    <tr>
++                        <td width="60" align="center" nowrap="nowrap">1</td>
++                        <td align="center">Search Name, Organization, Description, or City individually or search in each</td>
++                        <td width="200" align="center">
++                            <p:commandButton value="Search Type 1" icon="fas fa-search" styleClass="rounded-button"
++                                             update=":DBSearchDlg1" oncomplete="PF('DBSearchDialog1').show()" />
++                        </td>
++                    </tr>
++                    <tr>
++                        <td width="60" align="center" nowrap="nowrap">2</td>
++                        <td align="center">Name contains nameQ AND Organization contains organizationQ</td>
++                        <td width="200" align="center">
++                            <p:commandButton value="Search Type 2" icon="fas fa-search" styleClass="rounded-button"
++                                             update=":DBSearchDlg2" oncomplete="PF('DBSearchDialog2').show()" />
++                        </td>
++                    </tr>
++                    <tr>
++                        <td width="60" align="center" nowrap="nowrap">3</td>
++                        <td align="center">Name contains nameQ AND City contains cityQ</td>
++                        <td width="200" align="center">
++                            <p:commandButton value="Search Type 3" icon="fas fa-search" styleClass="rounded-button"
++                                             update=":DBSearchDlg3" oncomplete="PF('DBSearchDialog3').show()" />
++                        </td>
++                    </tr>
++                    <tr>
++                        <td width="60" align="center" nowrap="nowrap">4</td>
++                        <td align="center">City contains cityQ AND Description contains descriptionQ</td>
++                        <td width="200" align="center">
++                            <p:commandButton value="Search Type 4" icon="fas fa-search" styleClass="rounded-button"
++                                             update=":DBSearchDlg4" oncomplete="PF('DBSearchDialog4').show()" />
++                        </td>
++                    </tr>
++                    </tbody>
++                </table>
++                <br />
++            </div>
++        </h:form>
++
++        <!--
++        **************************************
++        Dialog pop-up window for Type 1 Search
++        **************************************
++        Search Name, Organization, Description, or City individually or search in each
++        -->
++        <p:dialog id="DBSearchDlg1" header="DB Search Type 1" widgetVar="DBSearchDialog1"
++                  modal="true" position="center" appendTo="@(body)"
++                  showEffect="slide" hideEffect="fade" responsive="true" >
++
++            <h:form id="EventSearchForm1">
++                <p:panel>
++                    <h:panelGrid columns="1" style="text-align: center">
++                        <!-- Search category is selected here. -->
++                        <p:selectOneMenu id="searchCategory" value="#{popularEventController.searchCategory}"
++                                         required="true" requiredMessage="Please select a category!" style="margin-bottom:10px;display:inline-block">
++
++                            <f:selectItem itemLabel="Select Search Category" itemValue="" noSelectionOption="true"/>
++                            <f:selectItem itemLabel="All" itemValue="all"/>
++                            <f:selectItem itemLabel="Name" itemValue="Name"/>
++                            <f:selectItem itemLabel="Organization" itemValue="Organization"/>
++                            <f:selectItem itemLabel="Description" itemValue="Description"/>
++                            <f:selectItem itemLabel="City" itemValue="City"/>
++
++                        </p:selectOneMenu>
++                        <br/>
++                        <!-- Search string is entered here. -->
++                        <p:inputText id="searchString" value="#{popularEventController.searchString}"
++                                     required="true" requiredMessage="Please enter a search string!"
++                                     placeholder="Enter search string" style="margin-bottom:10px;display:inline-block" >
++                            <f:validateLength minimum="1" />
++                        </p:inputText>
++                    </h:panelGrid>
++                    <h:panelGroup>
++                        <br/><br />
++                        <div align="center">
++                            <!-- SUBMIT button -->
++                            <p:commandButton value="Submit" icon="fas fa-arrow-up" styleClass="rounded-button"
++                                             ajax="false" action="#{popularEventController.search(1)}" />
++                            &nbsp;
++                            <!-- CANCEL button -->
++                            <p:commandButton value="Cancel" icon="fas fa-ban" styleClass="ui-button-outlined"
++                                             onclick="PF('DBSearchDialog1').hide()"/>
++                        </div>
++                    </h:panelGroup>
++                </p:panel>
++            </h:form>
++        </p:dialog>
++
++        <!--
++        **************************************
++        Dialog pop-up window for Type 2 Search
++        **************************************
++        Name contains nameQ AND Organization contains organizationQ
++        -->
++        <p:dialog id="DBSearchDlg2" header="DB Search Type 2" widgetVar="DBSearchDialog2"
++                  modal="true" position="center" appendTo="@(body)"
++                  showEffect="slide" hideEffect="fade" responsive="true" >
++
++            <h:form id="EventSearchForm2">
++                <p:panel>
++                    <h:panelGroup>
++                        <h:panelGrid columns="1" style="text-align: center;">
++                            <p:outputLabel value="Event Name" for="nameQ"/>
++                            <br/>
++                            <p:inputText id="nameQ" value="#{popularEventController.nameQ}"
++                                         required="true" requiredMessage="Name is required!" />
++                            <br/>
++                            <p:outputLabel value="Event Organization" for="organizationQ"/>
++                            <br/>
++                            <p:inputText id="organizationQ" value="#{popularEventController.organizationQ}"
++                                         required="true" requiredMessage="Organization is required!" />
++                        </h:panelGrid>
++                    </h:panelGroup>
++
++                    <h:panelGroup>
++                        <br/><br/>
++                        <div align="center">
++                            <!-- SUBMIT button -->
++                            <p:commandButton value="Submit" icon="fas fa-arrow-up" styleClass="rounded-button"
++                                             ajax="false" action="#{popularEventController.search(2)}"/>
++                            &nbsp;
++                            <!-- CANCEL button -->
++                            <p:commandButton value="Cancel" icon="fas fa-ban" styleClass="ui-button-outlined"
++                                             onclick="PF('DBSearchDialog2').hide()"/>
++                        </div>
++                    </h:panelGroup>
++                </p:panel>
++            </h:form>
++        </p:dialog>
++
++        <!--
++        **************************************
++        Dialog pop-up window for Type 3 Search
++        **************************************
++        Name contains nameQ AND City contains cityQ
++        -->
++        <p:dialog id="DBSearchDlg3" header="DB Search Type 3" widgetVar="DBSearchDialog3"
++                  modal="true" position="center" appendTo="@(body)"
++                  showEffect="slide" hideEffect="fade" responsive="true" >
++
++            <h:form id="EventSearchForm3">
++                <p:panel>
++                    <h:panelGroup>
++                        <h:panelGrid columns="1" style="text-align: center;">
++                            <p:outputLabel value="Event Name" for="nameQ1"/>
++                            <br/>
++                            <p:inputText id="nameQ1" value="#{popularEventController.nameQ}"
++                                         required="true" requiredMessage="Name is required!" />
++                            <br/>
++                            <p:outputLabel value="Event City" for="cityQ"/>
++                            <br/>
++                            <p:inputText id="cityQ" value="#{popularEventController.cityQ}"
++                                         required="true" requiredMessage="City is required!" />
++                        </h:panelGrid>
++                    </h:panelGroup>
++                    <h:panelGroup>
++                        <br/><br/>
++                        <div align="center">
++                            <!-- SUBMIT button -->
++                            <p:commandButton value="Submit" icon="fas fa-arrow-up" styleClass="rounded-button"
++                                             ajax="false" action="#{popularEventController.search(3)}"/>
++                            &nbsp;
++                            <!-- CANCEL button -->
++                            <p:commandButton value="Cancel" icon="fas fa-ban" styleClass="ui-button-outlined"
++                                             onclick="PF('DBSearchDialog3').hide()"/>
++                        </div>
++                    </h:panelGroup>
++                </p:panel>
++            </h:form>
++        </p:dialog>
++
++        <!--
++        **************************************
++        Dialog pop-up window for Type 4 Search
++        **************************************
++        City contains cityQ and Description contains descriptionQ
++        -->
++        <p:dialog id="DBSearchDlg4" header="DB Search Type 4" widgetVar="DBSearchDialog4"
++                  modal="true" position="center" appendTo="@(body)"
++                  showEffect="slide" hideEffect="fade" responsive="true" >
++
++            <h:form id="EventSearchForm4">
++                <p:panel>
++                    <h:panelGroup>
++                        <h:panelGrid columns="1" style="text-align: center;">
++                            <p:outputLabel value="Event City" for="cityQ1"/>
++                            <br/>
++                            <p:inputText id="cityQ1" value="#{popularEventController.cityQ}"
++                                         required="true" requiredMessage="City is required!" />
++                            <br/>
++                            <p:outputLabel value="Event Description Phrase" for="descriptionQ"/>
++                            <br/>
++                            <p:inputText id="descriptionQ" value="#{popularEventController.descriptionQ}"
++                                         required="true" requiredMessage="Description Phrase is required!" />
++                        </h:panelGrid>
++                    </h:panelGroup>
++                    <h:panelGroup>
++                        <br/><br/>
++                        <div align="center">
++                            <!-- SUBMIT button -->
++                            <p:commandButton value="Submit" icon="fas fa-arrow-up" styleClass="rounded-button"
++                                             ajax="false" action="#{popularEventController.search(4)}"/>
++                            &nbsp;
++                            <!-- CANCEL button -->
++                            <p:commandButton value="Cancel" icon="fas fa-ban" styleClass="ui-button-outlined"
++                                             onclick="PF('DBSearchDialog4').hide()"/>
++                        </div>
++                    </h:panelGroup>
++                </p:panel>
++            </h:form>
++        </p:dialog>
++    </ui:define>
++</ui:composition>
++</html>

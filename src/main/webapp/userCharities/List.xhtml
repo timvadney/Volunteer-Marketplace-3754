@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  - Created by Osman Balci on 2024.2.8
+  - Copyright © 2024 Osman Balci. All rights reserved.
+  -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:ui="jakarta.faces.facelets"
+      xmlns:h="jakarta.faces.html"
+      xmlns:f="jakarta.faces.core"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:c="jakarta.tags.core">
+
+<!-- This page is constructed based on the siteTemplate -->
+<ui:composition template="/template/siteTemplate.xhtml">
+    <ui:define name="title">
+        <!-- Set the page title -->
+        <h:outputText value="My Charities"/>
+    </ui:define>
+
+    <!-- Create the content for this page below -->
+    <ui:define name="editableContent">
+
+        <!-- In case of Jakarta Faces validation error, set 'selected' to null in countryApiController -->
+        <c:if test="#{facesContext.validationFailed}">
+            ${charityController.unselect()}
+        </c:if>
+
+        <!-- Set 'selected' to null in countryApiController when the user refreshes / reloads this Jakarta Faces page -->
+        <f:metadata>
+            <f:viewAction action="#{charityController.unselect()}" rendered="#{facesContext.postback}"/>
+        </f:metadata>
+
+        <div align="center">
+            <h:form id="CharitiesListForm">
+                <p:panel header="My Donations">
+                    <p:dataTable id="datalist"
+                                 value="#{charityController.listOfCharities}"
+                                 var="aCharity"
+                                 widgetVar="charitiesApiDataTable"
+                                 selectionMode="single"
+                                 selection="#{charityController.selected}"
+                                 reflow="true"
+                                 showGridlines="true"
+                                 paginator="true"
+                                 rowKey="#{aCharity.id}"
+                                 rows="5"
+                                 rowsPerPageTemplate="5,10,20,30,50,70,90">
+
+                        <p:ajax event="rowSelect" update="viewButton"/>
+                        <p:ajax event="rowUnselect" update="viewButton"/>
+
+                        <!--
+                        *********************
+                        *    Charity Name   *
+                        *********************
+                        -->
+                        <p:column headerText="Organization" sortBy="#{aCharity.title}"
+                                  style="vertical-align: top; width: 200px;">
+                            <h:outputText value="#{aCharity.title}"/>
+                        </p:column>
+
+                        <!--
+                        *********************
+                        *    Charity Logo   *
+                        *********************
+                        Country code must be in lower case for the flag URL
+                        -->
+                        <p:column headerText="Logo" style="width: 60px; text-align: center; vertical-align: top">
+                            <img src="#{aCharity.logoUrl}"
+                                 alt="Charity Logo" width="60px" height="60px"/>
+                        </p:column>
+
+                        <!--
+                        ******************************
+                        *    Charity Mission   *
+                        ******************************
+                        -->
+                        <p:column headerText="Mission Statement" sortBy="#{aCharity.description}"
+                                  style="vertical-align: top">
+                            <h:outputText value="#{aCharity.description}"/>
+                        </p:column>
+
+                        <!--
+                        *********************
+                        *  Charity Location *
+                        *********************
+                        -->
+                        <p:column headerText="Based in" sortBy="#{aCharity.location}"
+                                  style="vertical-align: top; text-align: center; width: 150px">
+                            <h:outputText value="#{aCharity.location}"/>
+                        </p:column>
+
+                        <!--
+                        ***************************
+                        *    Charity Website   *
+                        ***************************
+                        -->
+                        <p:column headerText="Website" style="vertical-align: top; width: 60px; text-align: center">
+                            <a href = "#{aCharity.websiteUrl}">
+                                <img src="#{resource['images:wwwIcon.png']}"
+                                     alt="WWW Icon" style="width: 40px; text-align: center; vertical-align: top"/>
+                            </a>
+                        </p:column>
+
+                        <!--
+                        *********************
+                        *  Donation Amount  *
+                        *********************
+                        -->
+                        <p:column headerText="Amount Donated" sortBy="#{aCharity.amountDonated}"
+                                  style="vertical-align: top; text-align: center; width: 80px">
+                            <h:outputText value="#{aCharity.amountDonated}">
+                                <f:convertNumber currencySymbol="$" type="currency"/>
+                            </h:outputText>
+                        </p:column>
+
+                        <!--
+                        *************************
+                        *   Data Table Footer   *
+                        *************************
+                        -->
+                        <f:facet name="footer">
+                            <div align="center">
+                                <!-- VIEW button: id is used since it is referenced to be activated or deactivated -->
+                                <p:commandButton id="viewButton" value="View" icon="fas fa-eye" styleClass="rounded-button"
+                                                 update=":CharityViewDlg" oncomplete="PF('CharityViewDialog').show()"
+                                                 disabled="#{empty charityController.selected}"/>
+                                &nbsp;
+                                <!-- DONATE button: id is used since it is referenced to be activated or deactivated -->
+                                <!--                                <p:commandButton id="donateButton" value="Donate" icon="fa-solid fa-dollar-sign" styleClass="rounded-button"-->
+                                <!--                                                 onclick="window.open('#{charityApiController.selected.donationUrl}', '_blank');"-->
+                                <!--                                                 oncomplete="PF('CharityCheckDonateDialog').show()" update=":CharityCheckDonateDlg"-->
+                                <!--                                                 disabled="#{empty charityApiController.selected || !userController.userIsSignedIn()}">-->
+                                <!--                                </p:commandButton>-->
+                            </div>
+                        </f:facet>
+                    </p:dataTable>
+                </p:panel>
+            </h:form>
+        </div>
+
+        <!--
+        ==========================================================
+        |  Clicking the VIEW button in List.xhtml displays this  |
+        |  Dialog window showing the selected country's data.    |
+        ==========================================================
+        height="400" makes the dialog window to be vertically scrollable
+        width="60%" and responsive="true" make the dialog window horizontally responsive
+        class="scalableImage" makes the displayed image responsive
+        -->
+        <p:dialog id="CharityViewDlg" header="#{charityApiController.selected.name}" widgetVar="CharityViewDialog"
+                  modal="true" position="center" appendTo="@(body)" width="70%" height="500"
+                  showEffect="slide" hideEffect="fade" responsive="true" >
+            <!--
+            Various effect options can be used when showing and closing the dialog.
+            Use showEffect and hideEffect options to apply these effects:
+                blind, bounce, clip, drop, explode, fade, fold, highlight, puff,
+                pulsate, scale, shake, size, slide and transfer. [PrimeFaces Documentation]
+            -->
+            <h:form id="CharitViewForm" class="ui-datatable-data">
+                <div align="center">
+                    <!--
+                    We define the local variable countryCode and use it below as a method parameter.
+                    The local variable's value is set by the EL expression during view build time.
+                    -->
+                    <c:set var="countryCode" value="#{charityController.selected.id}" scope="request" />
+
+                    <!-- Display the selected country's flag image -->
+                    <img src="#{charityController.selected.logoUrl}"
+                         alt="Charity Logo" style="width:30%; height: 2%" />
+                    <br /><br />
+                    <h:panelGroup id="display">
+                        <table border="0" align="center" cellpadding="5" cellspacing="0">
+                            <tbody>
+                            <tr>
+                                <td align="right" valign="middle" nowrap="nowrap" bgcolor="papayawhip">
+                                    <h:outputText value="Based in:"/>
+                                </td>
+                                <td align="left" valign="middle" bgcolor="oldlace">
+                                    <h:outputText value="#{charityController.selected.location}"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="right" valign="middle" nowrap="nowrap" bgcolor="papayawhip">
+                                    <h:outputText value="Website:"/>
+                                </td>
+                                <td align="left" valign="middle"  bgcolor="oldlace">
+                                    <a href = "#{charityController.selected.websiteUrl}">
+                                        <img src="#{resource['images:wwwIcon.png']}"
+                                             alt="WWW Icon" style="width: 50px; text-align: center;"/>
+                                    </a>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </h:panelGroup>
+                    &nbsp;
+                    <fieldset style="width:80%">
+                        <h:outputText value="#{charityController.selected.description}" escape="false" />
+                    </fieldset>
+                    <br />
+                    <h:panelGroup>
+                        <!-- CLOSE button -->
+                        <p:commandButton value="Close" icon="fas fa-window-close" styleClass="ui-button-outlined"
+                                         onclick="PF('CharityViewDialog').hide()" />
+                    </h:panelGroup>
+                </div>
+            </h:form>
+        </p:dialog>
+    </ui:define>
+</ui:composition>
+</html>
